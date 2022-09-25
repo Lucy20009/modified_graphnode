@@ -12,7 +12,7 @@ use graph::{
     },
 };
 use graph_chain_ethereum::{self as ethereum, NodeCapabilities};
-use graph_store_postgres::{DeploymentPlacer, Shard as ShardName, PRIMARY_SHARD};
+use graph_store_postgres::{DeploymentPlacer, Shard as ShardName, PRIMARY_SHARD, PRIMARY_SHARD_NEBULA};
 
 use http::{HeaderMap, Uri};
 use regex::Regex;
@@ -29,6 +29,7 @@ const NO_NAME: &str = ".^";
 
 pub struct Opt {
     pub postgres_url: Option<String>,
+    pub nebula_url: Option<String>,
     pub config: Option<String>,
     // This is only used when we cosntruct a config purely from command
     // line options. When using a configuration file, pool sizes must be
@@ -48,6 +49,7 @@ impl Default for Opt {
     fn default() -> Self {
         Opt {
             postgres_url: None,
+            nebula_url: None,
             config: None,
             store_connection_pool_size: 10,
             postgres_secondary_hosts: vec![],
@@ -180,6 +182,7 @@ impl Config {
         let node = NodeId::new(opt.node_id.to_string())
             .map_err(|()| anyhow!("invalid node id {}", opt.node_id))?;
         stores.insert(PRIMARY_SHARD.to_string(), Shard::from_opt(true, opt)?);
+        stores.insert(PRIMARY_SHARD_NEBULA.to_string(), Shard::from_opt_nebula(true, opt)?);
         Ok(Config {
             node,
             general: None,
@@ -202,6 +205,12 @@ impl Config {
     pub fn primary_store(&self) -> &Shard {
         self.stores
             .get(PRIMARY_SHARD.as_str())
+            .expect("a validated config has a primary store")
+    }
+
+    pub fn primary_store_nebula(&self) -> &Shard {
+        self.stores
+            .get(PRIMARY_SHARD_NEBULA.as_str())
             .expect("a validated config has a primary store")
     }
 
@@ -282,6 +291,31 @@ impl Shard {
         }
         Ok(Self {
             connection: postgres_url.clone(),
+            weight: opt.postgres_host_weights.get(0).cloned().unwrap_or(1),
+            pool_size,
+            fdw_pool_size: PoolSize::five(),
+            replicas,
+        })
+    }
+
+    fn from_opt_nebula(is_primary: bool, opt: &Opt) -> Result<Self> {
+        let nebula_url = opt
+            .nebula_url
+            .as_ref()
+            .expect("validation checked that postgres_url is set");
+        let pool_size = PoolSize::Fixed(opt.store_connection_pool_size);
+        pool_size.validate(is_primary, &nebula_url)?;
+        let mut replicas = BTreeMap::new();
+        for (i, host) in opt.postgres_secondary_hosts.iter().enumerate() {
+            let replica = Replica {
+                connection: replace_host(&nebula_url, &host),
+                weight: opt.postgres_host_weights.get(i + 1).cloned().unwrap_or(1),
+                pool_size: pool_size.clone(),
+            };
+            replicas.insert(format!("replica{}", i + 1), replica);
+        }
+        Ok(Self {
+            connection: nebula_url.clone(),
             weight: opt.postgres_host_weights.get(0).cloned().unwrap_or(1),
             pool_size,
             fdw_pool_size: PoolSize::five(),

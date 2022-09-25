@@ -443,6 +443,7 @@ mod test {
 
         let opt = Opt {
             postgres_url: Some("not needed".to_string()),
+            nebula_url: Some("not needed".to_string()),
             config: None,
             store_connection_pool_size: 5,
             postgres_secondary_hosts: vec![],

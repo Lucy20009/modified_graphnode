@@ -57,6 +57,7 @@ pub struct Shard(String);
 lazy_static! {
     /// The name of the primary shard that contains all instance-wide data
     pub static ref PRIMARY_SHARD: Shard = Shard("primary".to_string());
+    pub static ref PRIMARY_SHARD_NEBULA: Shard = Shard("primary_nebula".to_string());
 }
 
 /// How long to cache information about a deployment site

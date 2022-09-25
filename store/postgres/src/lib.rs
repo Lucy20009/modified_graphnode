@@ -62,7 +62,7 @@ pub use self::notification_listener::NotificationSender;
 pub use self::primary::{db_version, UnusedDeployment};
 pub use self::store::Store;
 pub use self::store_events::SubscriptionManager;
-pub use self::subgraph_store::{unused, DeploymentPlacer, Shard, SubgraphStore, PRIMARY_SHARD};
+pub use self::subgraph_store::{unused, DeploymentPlacer, Shard, SubgraphStore, PRIMARY_SHARD, PRIMARY_SHARD_NEBULA};
 
 /// This module is only meant to support command line tooling. It must not
 /// be used in 'normal' graph-node code

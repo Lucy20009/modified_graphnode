@@ -60,6 +60,16 @@ pub struct Opt {
         help = "Comma-separated list of host names/IP's for read-only Postgres replicas, \
            which will share the load with the primary server"
     )]
+    pub nebula_url: Option<String>,
+    #[structopt(
+        long,
+        value_name = "URL,",
+        use_delimiter = true,
+        env = "GRAPH_NEBULA_SECONDARY_HOSTS",
+        conflicts_with = "config",
+        help = "Comma-separated list of host names/IP's for read-only Nebula replicas, \
+        which will share the load with the primary server"
+    )]
     // FIXME: Make sure delimiter is ','
     pub postgres_secondary_hosts: Vec<String>,
     #[clap(
@@ -229,6 +239,7 @@ impl From<Opt> for config::Opt {
     fn from(opt: Opt) -> Self {
         let Opt {
             postgres_url,
+            nebula_url,
             config,
             store_connection_pool_size,
             postgres_host_weights,
@@ -244,6 +255,7 @@ impl From<Opt> for config::Opt {
 
         config::Opt {
             postgres_url,
+            nebula_url,
             config,
             store_connection_pool_size,
             postgres_host_weights,
