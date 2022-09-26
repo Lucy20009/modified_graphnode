@@ -32,6 +32,7 @@ use graph_node::chain::{
 use graph_node::config::Config;
 use graph_node::opt;
 use graph_node::store_builder::StoreBuilder;
+use graph_node::store_builder_nebula::StoreBuilder_nebula;
 use graph_server_http::GraphQLServer as GraphQLQueryServer;
 use graph_server_index_node::IndexNodeServer;
 use graph_server_json_rpc::JsonRpcServer;
@@ -256,6 +257,18 @@ async fn main() {
         metrics_registry.cheap_clone(),
     )
     .await;
+
+    let store_builder_nebula = StoreBuilder_nebula::new(
+        &logger,
+        &config
+    )
+    .await;
+
+    // let session = store_builder_nebula.connection_pool.get_session("root", "nebula", true).await.unwrap();
+    // let resp = session.execute("show spaces").await.unwrap();
+    // println!("SHOW SPACES: ");
+    // resp.show_data();
+    // println!("====================================");
 
     let launch_services = |logger: Logger| async move {
         let subscription_manager = store_builder.subscription_manager();

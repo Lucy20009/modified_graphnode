@@ -10,6 +10,7 @@ pub mod chain;
 pub mod config;
 pub mod opt;
 pub mod store_builder;
+pub mod store_builder_nebula;
 
 pub mod manager;
 

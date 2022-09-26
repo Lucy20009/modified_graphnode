@@ -95,9 +95,17 @@ impl StoreBuilder {
     ) -> (Arc<SubgraphStore>, HashMap<ShardName, ConnectionPool>) {
         let notification_sender = Arc::new(NotificationSender::new(registry.cheap_clone()));
 
+        fn is_postgres_url(s:&str)->bool{
+            if s.contains("postgres"){
+                return true;
+            }
+            return false;
+        }
+
         let servers = config
             .stores
             .iter()
+            .filter(|(_, shard)| is_postgres_url(&shard.connection))
             .map(|(name, shard)| ForeignServer::new_from_raw(name.to_string(), &shard.connection))
             .collect::<Result<Vec<_>, _>>()
             .expect("connection url's contain enough detail");
@@ -106,6 +114,7 @@ impl StoreBuilder {
         let shards: Vec<_> = config
             .stores
             .iter()
+            .filter(|(_, shard)| is_postgres_url(&shard.connection))
             .map(|(name, shard)| {
                 let logger = logger.new(o!("shard" => name.to_string()));
                 let conn_pool = Self::main_pool(
