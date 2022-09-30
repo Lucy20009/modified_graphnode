@@ -2091,6 +2091,7 @@ dependencies = [
  "lazy_static",
  "lru_time_cache",
  "maybe-owned",
+ "nebula-rust",
  "openssl",
  "pin-utils",
  "postgres",

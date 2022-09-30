@@ -15,7 +15,7 @@ use graph_store_postgres::{
     NotificationSender, Shard as ShardName, Store as DieselStore, SubgraphStore,
     SubscriptionManager, PRIMARY_SHARD,
 };
-
+use nebula_rust::graph_client::{pool_config, connection_pool, session};
 use crate::config::{Config, Shard};
 
 pub struct StoreBuilder {
@@ -96,6 +96,7 @@ impl StoreBuilder {
         let notification_sender = Arc::new(NotificationSender::new(registry.cheap_clone()));
 
         fn is_postgres_url(s:&str)->bool{
+            // println!("======={:?}========", s);
             if s.contains("postgres"){
                 return true;
             }
@@ -141,6 +142,24 @@ impl StoreBuilder {
             })
             .collect();
 
+        // filter out nebula_url
+        let shard_nebula: Vec<_> = config
+            .stores
+            .iter()
+            .filter(|(_, shard)| !is_postgres_url(&shard.connection))
+            .map(|(_, shard)| {
+                &shard.connection
+            })
+            .collect();
+        // println!("================shard_nebula:{:?}==================", shard_nebula.len());
+        let nebula_url = shard_nebula[0].clone();
+        // let nebula_connection = connection_pool::ConnectionPool_nebula::new_pool(nebula_url.as_str());
+        // println!("===============conf===============");
+        // nebula_connection.get_config();
+
+
+
+
         let pools: HashMap<_, _> = HashMap::from_iter(
             shards
                 .iter()
@@ -154,6 +173,7 @@ impl StoreBuilder {
             notification_sender,
             fork_base,
             registry,
+            nebula_url,
         ));
 
         (store, pools)

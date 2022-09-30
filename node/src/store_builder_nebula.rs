@@ -23,7 +23,7 @@ use tokio::*;
 
 pub struct StoreBuilder_nebula {
     pub logger: Logger,
-    pub connection_pool: connection_pool::ConnectionPool,
+    pub connection_pool: connection_pool::ConnectionPool_nebula,
 }
 
 impl StoreBuilder_nebula{
@@ -38,12 +38,22 @@ impl StoreBuilder_nebula{
         let v:Vec<&str> = conn_info.split('@').collect();
         let v2:Vec<&str> = v[1].split('/').collect();
         let add = String::from(v2[0]);
+        let v3:Vec<&str> = v[0].split(':').collect();
+        let username = String::from(v3[0]);
+        let password = String::from(v3[1]);
+
         let mut conf = pool_config::PoolConfig::new();
         conf.min_connection_pool_size(2)
             .max_connection_pool_size(10)
-            .address(add);
+            .address(add)
+            .set_username(username)
+            .set_password(password);
     
-        let pool = connection_pool::ConnectionPool::new(&conf).await;
+        // println!("===============PoolConfig============");
+        // println!("{:?}", conf);
+
+        let pool = connection_pool::ConnectionPool_nebula::new(&conf);
+        pool.create_new_connection().await;
         info!(logger, "Successfully connecting to NebulaGraph!");
         // let session = pool.get_session("root", "nebula", true).await.unwrap();
 
@@ -64,7 +74,8 @@ mod tests {
             .max_connection_pool_size(10)
             .address("localhost:9669".to_string());
     
-        let pool = graph_client::connection_pool::ConnectionPool::new(&conf).await;
+        let pool = graph_client::connection_pool::ConnectionPool_nebula::new(&conf);
+        pool.create_new_connection().await;
         let session = pool.get_session("root", "nebula", true).await.unwrap();
     
     }

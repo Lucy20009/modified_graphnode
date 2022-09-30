@@ -33,8 +33,9 @@ use graph::{
     url::Url,
     util::timed_cache::TimedCache,
 };
+use nebula_rust::graph_client::connection_pool::ConnectionPool_nebula;
 
-use crate::fork;
+use crate::{fork, connection_pool};
 use crate::{
     connection_pool::ConnectionPool,
     deployment::SubgraphHealth,
@@ -196,6 +197,7 @@ pub struct SubgraphStore {
     /// subgraph forks will fetch entities.
     /// Example: https://api.thegraph.com/subgraphs/
     fork_base: Option<Url>,
+
 }
 
 impl SubgraphStore {
@@ -220,10 +222,12 @@ impl SubgraphStore {
         sender: Arc<NotificationSender>,
         fork_base: Option<Url>,
         registry: Arc<dyn MetricsRegistry>,
+        nebula_url: String,
+        // pool_nebula: connection_test::ConnectionPool,
     ) -> Self {
         Self {
             inner: Arc::new(SubgraphStoreInner::new(
-                logger, stores, placer, sender, registry,
+                logger, stores, placer, sender, registry, nebula_url,
             )),
             fork_base,
         }
@@ -299,6 +303,7 @@ impl SubgraphStoreInner {
         placer: Arc<dyn DeploymentPlacer + Send + Sync + 'static>,
         sender: Arc<NotificationSender>,
         registry: Arc<dyn MetricsRegistry>,
+        nebula_url: String,
     ) -> Self {
         let mirror = {
             let pools = HashMap::from_iter(

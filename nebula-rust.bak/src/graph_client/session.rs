@@ -5,12 +5,12 @@
  */
 
 use crate::graph_client::connection::Connection;
-use crate::graph_client::connection_pool::ConnectionPool_nebula;
+use crate::graph_client::connection_pool::ConnectionPool;
 
 pub struct Session<'a> {
     session_id: i64,
     conn: Connection,
-    pool: &'a ConnectionPool_nebula,
+    pool: &'a ConnectionPool,
     username: String,
     password: String,
     // empty means not a named timezone
@@ -25,7 +25,7 @@ impl<'a> Session<'a> {
     pub fn new(
         session_id: i64,
         conn: Connection,
-        pool: &'a ConnectionPool_nebula,
+        pool: &'a ConnectionPool,
         username: String,
         password: String,
         time_zone_name: String,

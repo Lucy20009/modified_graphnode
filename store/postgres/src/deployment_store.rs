@@ -37,6 +37,7 @@ use graph::prelude::{
 };
 use graph_graphql::prelude::api_schema;
 use web3::types::Address;
+use nebula_rust::graph_client::{pool_config, connection_pool, session};
 
 use crate::block_range::block_number;
 use crate::catalog;
@@ -99,6 +100,10 @@ pub struct StoreInner {
     /// hosts this because it lives long enough, but it is managed from
     /// the entities module
     pub(crate) layout_cache: LayoutCache,
+
+    // pool_nebula: connection_test::ConnectionPool,
+
+
 }
 
 /// Storage of the data for individual deployments. Each `DeploymentStore`
@@ -121,6 +126,7 @@ impl DeploymentStore {
         pool: ConnectionPool,
         read_only_pools: Vec<ConnectionPool>,
         mut pool_weights: Vec<usize>,
+        // pool_nebula: connection_test::ConnectionPool
     ) -> Self {
         // Create a store-specific logger
         let logger = logger.new(o!("component" => "Store"));
@@ -155,6 +161,7 @@ impl DeploymentStore {
             conn_round_robin_counter: AtomicUsize::new(0),
             subgraph_cache: Mutex::new(LruCache::with_capacity(100)),
             layout_cache: LayoutCache::new(ENV_VARS.store.query_stats_refresh_interval),
+            // pool_nebula: pool_nebula,
         };
 
         DeploymentStore(Arc::new(store))
