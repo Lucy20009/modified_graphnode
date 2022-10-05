@@ -53,6 +53,7 @@ use graph::prelude::{
     EntityFilter, EntityOperation, EntityOrder, EntityRange, Logger, QueryExecutionError,
     StoreError, StoreEvent, ValueType, BLOCK_NUMBER_MAX,
 };
+use nebula_rust::graph_client::{pool_config, connection_pool, session};
 
 use crate::block_range::{BLOCK_COLUMN, BLOCK_RANGE_COLUMN};
 pub use crate::catalog::Catalog;
@@ -402,9 +403,24 @@ impl Layout {
     ) -> Result<Layout, StoreError> {
         let catalog = Catalog::for_creation(site.cheap_clone());
         let layout = Self::new(site, schema, catalog)?;
+
+        // println!("===============tables=================");
+        // for (k,v) in &layout.tables{
+        //     println!("{:?}", k);
+        //     println!("{:?}", v);
+        //     println!("{:?}", v.object);
+        //     println!("+++++++++++++");
+        // }
+
         let sql = layout
             .as_ddl()
             .map_err(|_| StoreError::Unknown(anyhow!("failed to generate DDL for layout")))?;
+
+
+
+        // println!("======================sql==================");
+        // println!("{:?}", sql.clone());
+
         conn.batch_execute(&sql)?;
         Ok(layout)
     }

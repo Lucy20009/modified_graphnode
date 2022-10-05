@@ -185,18 +185,23 @@ impl DeploymentStore {
         replace: bool,
     ) -> Result<(), StoreError> {
 
+        let conn = self.get_conn()?;
+
+        // create layout
+        // let layout = Layout::create_relational_schema(&conn, site.clone(), schema)?;
+
         // get nebula session
         let pool_nebula = &self.pool_nebula;
         pool_nebula.create_new_connection().await;
         let session = pool_nebula.get_session(true).await.unwrap();
-        
-        let resp = session.execute("show spaces").await.unwrap();
-        println!("SHOW SPACES: ");
-        resp.show_data();
-        println!("====================================");
+        // CREATE SPACE `token_transfer` (partition_num = 1, replica_factor = 1, vid_type = FIXED_STRING(50))
 
-        let conn = self.get_conn()?;
-        conn.transaction(|| -> Result<_, StoreError> {
+        let mut tables: Vec<Arc<Table>> = Vec::new();
+
+        println!("==============schema=================");
+        println!("{:?}", schema.document);
+
+        let res:Result<(), StoreError> = conn.transaction(|| -> Result<_, StoreError> {
             let exists = deployment::exists(&conn, &site)?;
 
             // Create (or update) the metadata. Update only happens in tests
@@ -210,6 +215,8 @@ impl DeploymentStore {
                 conn.batch_execute(&query)?;
 
                 let layout = Layout::create_relational_schema(&conn, site.clone(), schema)?;
+
+
                 // See if we are grafting and check that the graft is permissible
                 if let Some(base) = graft_base {
                     let errors = layout.can_copy_from(&base);
@@ -228,9 +235,22 @@ impl DeploymentStore {
                 if site.schema_version.private_data_sources() {
                     conn.batch_execute(&DataSourcesTable::new(site.namespace.clone()).as_ddl())?;
                 }
+
+
+                for (_, v) in layout.tables{
+                    tables.push(v);
+                }
             }
             Ok(())
-        })
+        });
+
+        println!("===============tables===============");
+        for table in tables{
+            println!("{:?}", table.object.as_str());
+        }
+
+        res
+        
     }
 
     pub(crate) fn load_deployment(
