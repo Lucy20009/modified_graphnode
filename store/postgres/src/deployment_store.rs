@@ -102,6 +102,7 @@ pub struct StoreInner {
     pub(crate) layout_cache: LayoutCache,
 
     // pool_nebula: connection_test::ConnectionPool,
+    pool_nebula: connection_pool::ConnectionPool_nebula,
 
 
 }
@@ -126,6 +127,7 @@ impl DeploymentStore {
         pool: ConnectionPool,
         read_only_pools: Vec<ConnectionPool>,
         mut pool_weights: Vec<usize>,
+        nebula_url: String,
         // pool_nebula: connection_test::ConnectionPool
     ) -> Self {
         // Create a store-specific logger
@@ -152,6 +154,11 @@ impl DeploymentStore {
         replica_order.shuffle(&mut rng);
         debug!(logger, "Using postgres host order {:?}", replica_order);
 
+
+
+        // init nebula connection pool
+        let pool_nebula = connection_pool::ConnectionPool_nebula::new_pool(nebula_url.as_str());
+
         // Create the store
         let store = StoreInner {
             logger: logger.clone(),
@@ -162,12 +169,14 @@ impl DeploymentStore {
             subgraph_cache: Mutex::new(LruCache::with_capacity(100)),
             layout_cache: LayoutCache::new(ENV_VARS.store.query_stats_refresh_interval),
             // pool_nebula: pool_nebula,
+            pool_nebula,
+
         };
 
         DeploymentStore(Arc::new(store))
     }
 
-    pub(crate) fn create_deployment(
+    pub(crate) async fn create_deployment(
         &self,
         schema: &Schema,
         deployment: DeploymentCreate,
@@ -175,6 +184,17 @@ impl DeploymentStore {
         graft_base: Option<Arc<Layout>>,
         replace: bool,
     ) -> Result<(), StoreError> {
+
+        // get nebula session
+        let pool_nebula = &self.pool_nebula;
+        pool_nebula.create_new_connection().await;
+        let session = pool_nebula.get_session(true).await.unwrap();
+        
+        let resp = session.execute("show spaces").await.unwrap();
+        println!("SHOW SPACES: ");
+        resp.show_data();
+        println!("====================================");
+
         let conn = self.get_conn()?;
         conn.transaction(|| -> Result<_, StoreError> {
             let exists = deployment::exists(&conn, &site)?;

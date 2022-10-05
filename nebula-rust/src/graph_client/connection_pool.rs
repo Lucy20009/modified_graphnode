@@ -68,10 +68,15 @@ impl ConnectionPool_nebula {
     /// 获取由用户名和密码验证的会话 retry_connect 表示如果为真则保持连接可用
     pub async fn get_session(
         &self,
-        username: &str,
-        password: &str,
+        // username: &str,
+        // password: &str,
         retry_connect: bool,
     ) -> std::result::Result<Session<'_>, common::types::ErrorCode> {
+
+        let username = self.config.username.clone();
+        let password = self.config.password.clone();
+
+
         println!("==========getSession=============");
         if self.conns.lock().unwrap().borrow_mut().is_empty() {
             self.new_connection(1).await;
@@ -79,7 +84,7 @@ impl ConnectionPool_nebula {
         let conn = self.conns.lock().unwrap().borrow_mut().pop_back();
         if let Some(conn) = conn {
             // get authentication with username and password
-            let resp = conn.authenticate(username, password).await?;
+            let resp = conn.authenticate(username.as_str(), password.as_str()).await?;
             if resp.error_code != common::types::ErrorCode::SUCCEEDED {
                 return Err(resp.error_code);
             }

@@ -324,6 +324,7 @@ impl SubgraphStoreInner {
                         main_pool,
                         read_only_pools,
                         weights,
+                        nebula_url.clone(),
                     )),
                 )
             },
@@ -489,7 +490,7 @@ impl SubgraphStoreInner {
     /// is careful to make sure this process is at least idempotent, so that
     /// a failed deployment creation operation can be fixed by deploying
     /// again.
-    fn create_deployment_internal(
+    async fn create_deployment_internal(
         &self,
         name: SubgraphName,
         schema: &Schema,
@@ -549,7 +550,7 @@ impl SubgraphStoreInner {
             site.clone(),
             graft_base,
             replace,
-        )?;
+        ).await?;
 
         let exists_and_synced = |id: &DeploymentHash| {
             let (store, _) = self.store(id)?;
@@ -570,7 +571,7 @@ impl SubgraphStoreInner {
         Ok(site.as_ref().into())
     }
 
-    pub fn copy_deployment(
+    pub async fn copy_deployment(
         &self,
         src: &DeploymentLocator,
         shard: Shard,
@@ -635,7 +636,7 @@ impl SubgraphStoreInner {
             dst.clone(),
             Some(graft_base),
             false,
-        )?;
+        ).await?;
 
         let pconn = self.primary_conn()?;
         pconn.transaction(|| -> Result<_, StoreError> {
@@ -664,7 +665,7 @@ impl SubgraphStoreInner {
     // Only for tests to simplify their handling of test fixtures, so that
     // tests can reset the block pointer of a subgraph by recreating it
     #[cfg(debug_assertions)]
-    pub fn create_deployment_replace(
+    pub async fn create_deployment_replace(
         &self,
         name: SubgraphName,
         schema: &Schema,
@@ -673,7 +674,7 @@ impl SubgraphStoreInner {
         network_name: String,
         mode: SubgraphVersionSwitchingMode,
     ) -> Result<DeploymentLocator, StoreError> {
-        self.create_deployment_internal(name, schema, deployment, node_id, network_name, mode, true)
+        self.create_deployment_internal(name, schema, deployment, node_id, network_name, mode, true).await
     }
 
     pub(crate) fn send_store_event(&self, event: &StoreEvent) -> Result<(), StoreError> {
@@ -1120,7 +1121,7 @@ impl SubgraphStoreTrait for SubgraphStore {
     }
 
     // FIXME: This method should not get a node_id
-    fn create_subgraph_deployment(
+    async fn create_subgraph_deployment(
         &self,
         name: SubgraphName,
         schema: &Schema,
@@ -1137,7 +1138,7 @@ impl SubgraphStoreTrait for SubgraphStore {
             network_name,
             mode,
             false,
-        )
+        ).await
     }
 
     fn create_subgraph(&self, name: SubgraphName) -> Result<String, StoreError> {
