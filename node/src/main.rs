@@ -258,11 +258,11 @@ async fn main() {
     )
     .await;
 
-    let store_builder_nebula = StoreBuilder_nebula::new(
-        &logger,
-        &config
-    )
-    .await;
+    // let store_builder_nebula = StoreBuilder_nebula::new(
+    //     &logger,
+    //     &config
+    // )
+    // .await;
 
 
     // let session = store_builder_nebula.connection_pool.get_session("root", "nebula", true).await.unwrap();

@@ -198,8 +198,8 @@ impl DeploymentStore {
 
         let mut tables: Vec<Arc<Table>> = Vec::new();
 
-        println!("==============schema=================");
-        println!("{:?}", schema.document);
+        // println!("==============schema=================");
+        // println!("{:?}", schema.document);
 
         let res:Result<(), StoreError> = conn.transaction(|| -> Result<_, StoreError> {
             let exists = deployment::exists(&conn, &site)?;
@@ -244,9 +244,24 @@ impl DeploymentStore {
             Ok(())
         });
 
-        println!("===============tables===============");
+        // println!("===============tables===============");
         for table in tables{
-            println!("{:?}", table.object.as_str());
+            // create space
+            let mut create_space_query: String = String::from("CREATE SPACE IF NOT EXISTS `");
+            create_space_query = create_space_query + table.object.as_str() + "` (partition_num = 1, replica_factor = 1, vid_type = FIXED_STRING(50));";
+            // let _resp = session.execute(create_space_query.as_str()).await.unwrap();
+
+            // use space
+            let mut use_space_query: String = String::from("use `");
+            use_space_query = use_space_query + table.object.as_str() + "`;";
+            // let _resp = session.execute(use_space_query.as_str()).await.unwrap();
+
+            // create tag
+            let create_tag_query = "CREATE tag IF NOT EXISTS `transfer` (`from` string NOT NULL  , `to` string NOT NULL  , `value` int32 NOT NULL  );";
+            // let _resp = session.execute(create_tag_query).await.unwrap();
+
+            let query = create_space_query + use_space_query.as_str() + create_tag_query;
+            let _resp = session.execute(query.as_str()).await.unwrap();
         }
 
         res

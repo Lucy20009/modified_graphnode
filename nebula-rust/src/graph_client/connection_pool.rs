@@ -24,7 +24,7 @@ impl ConnectionPool_nebula {
     /// Construct pool by the configuration
     pub fn new(conf: &PoolConfig) -> Self {
 
-        println!("conf: {:?}", conf.clone());
+        // println!("conf: {:?}", conf.clone());
 
         let conns = std::collections::LinkedList::<Connection>::new();
         let pool = ConnectionPool_nebula {
@@ -77,7 +77,7 @@ impl ConnectionPool_nebula {
         let password = self.config.password.clone();
 
 
-        println!("==========getSession=============");
+        // println!("==========getSession=============");
         if self.conns.lock().unwrap().borrow_mut().is_empty() {
             self.new_connection(1).await;
         }
@@ -185,10 +185,10 @@ impl ConnectionPool_nebula {
                 let mut a = self.cursor.lock().unwrap();
                 * a = 0;
             }
-                println!("return 0");
+                // println!("return 0");
             0
         } else {
-            println!("return cursor");
+            // println!("return cursor");
 
             let b: usize;
 

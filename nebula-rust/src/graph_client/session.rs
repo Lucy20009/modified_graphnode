@@ -59,7 +59,15 @@ impl<'a> Session<'a> {
         &self,
         query: &str,
     ) -> std::result::Result<graph::types::ExecutionResponse, common::types::ErrorCode> {
+        println!("{:?}", query);
         self.conn.execute(self.session_id, query).await
+    }
+
+    #[inline]
+    pub async fn use_space(&self, space_name: &str){
+        let mut query  = String::from("use ");
+        query = query + space_name;
+        let _resp = self.execute(query.as_str()).await.unwrap();
     }
 
     /// Get the time zone name

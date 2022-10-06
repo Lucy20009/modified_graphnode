@@ -76,7 +76,7 @@ mod tests {
     
         let pool = graph_client::connection_pool::ConnectionPool_nebula::new(&conf);
         pool.create_new_connection().await;
-        let session = pool.get_session("root", "nebula", true).await.unwrap();
+        let session = pool.get_session(true).await.unwrap();
     
     }
 }
