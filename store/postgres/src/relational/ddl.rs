@@ -33,6 +33,9 @@ impl Layout {
             table.as_ddl(&mut out, self)?;
         }
 
+        println!("==================out====================");
+        println!("{:?}", out);
+
         Ok(out)
     }
 
@@ -87,6 +90,13 @@ impl Table {
                 column.as_ddl(&mut cols)?;
                 first = false;
             }
+
+
+            println!("==================cols================");
+            println!("{:?}", cols);
+
+
+
             Ok(cols)
         }
 

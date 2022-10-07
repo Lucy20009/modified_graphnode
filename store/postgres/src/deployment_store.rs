@@ -38,6 +38,7 @@ use graph::prelude::{
 use graph_graphql::prelude::api_schema;
 use web3::types::Address;
 use nebula_rust::graph_client::{pool_config, connection_pool, session};
+use rand::Rng;
 
 use crate::block_range::block_number;
 use crate::catalog;
@@ -187,9 +188,6 @@ impl DeploymentStore {
 
         let conn = self.get_conn()?;
 
-        // create layout
-        // let layout = Layout::create_relational_schema(&conn, site.clone(), schema)?;
-
         // get nebula session
         let pool_nebula = &self.pool_nebula;
         pool_nebula.create_new_connection().await;
@@ -198,8 +196,6 @@ impl DeploymentStore {
 
         let mut tables: Vec<Arc<Table>> = Vec::new();
 
-        // println!("==============schema=================");
-        // println!("{:?}", schema.document);
 
         let res:Result<(), StoreError> = conn.transaction(|| -> Result<_, StoreError> {
             let exists = deployment::exists(&conn, &site)?;
@@ -246,6 +242,14 @@ impl DeploymentStore {
 
         // println!("===============tables===============");
         for table in tables{
+            
+            println!("============={:?}=============", table.object);
+            println!("name: {:?}", table.name);
+            println!("qualified_name: {:?}", table.qualified_name);
+            println!("columns: {:?}", table.columns);
+            println!("immutable: {:?}", table.immutable);
+
+
             // create space
             let mut create_space_query: String = String::from("CREATE SPACE IF NOT EXISTS `");
             create_space_query = create_space_query + table.object.as_str() + "` (partition_num = 1, replica_factor = 1, vid_type = FIXED_STRING(50));";
@@ -257,7 +261,7 @@ impl DeploymentStore {
             // let _resp = session.execute(use_space_query.as_str()).await.unwrap();
 
             // create tag
-            let create_tag_query = "CREATE tag IF NOT EXISTS `transfer` (`from` string NOT NULL  , `to` string NOT NULL  , `value` int32 NOT NULL  );";
+            let create_tag_query = "CREATE tag IF NOT EXISTS `transfer` (`from_account` string NOT NULL  , `to_account` string NOT NULL  , `value` int32 NOT NULL  );";
             // let _resp = session.execute(create_tag_query).await.unwrap();
 
             let query = create_space_query + use_space_query.as_str() + create_tag_query;
@@ -359,6 +363,19 @@ impl DeploymentStore {
         Ok(())
     }
 
+    fn get_random_string(len: usize) -> String{
+        let mut rng = rand::thread_rng();
+        let mut test: Vec<u8> = vec![0; len];
+        for i in &mut test{
+            let dig_or_char: u8 = rng.gen_range(0..=1);
+            match dig_or_char{
+                0 => *i = rng.gen_range(48..=57),
+                _ => *i = rng.gen_range(97..=122),
+            }
+        }
+        String::from_utf8(test).unwrap()
+    }
+
     fn apply_entity_modifications(
         &self,
         conn: &PgConnection,
@@ -366,7 +383,12 @@ impl DeploymentStore {
         mods: &[EntityModification],
         ptr: &BlockPtr,
         stopwatch: &StopwatchMetrics,
+        nebula_query: & mut Vec<Entity>,
     ) -> Result<i32, StoreError> {
+
+        // get nebula session
+        let pool_nebula = &self.pool_nebula;
+
         use EntityModification::*;
         let mut count = 0;
 
@@ -377,12 +399,18 @@ impl DeploymentStore {
         for modification in mods.into_iter() {
             match modification {
                 Insert { key, data } => {
+                    // println!("==========Insert==========");
+                    // println!("{:?}", data);
+                    nebula_query.push(data.clone());
                     inserts
                         .entry(key.entity_type.clone())
                         .or_insert_with(Vec::new)
                         .push((key, Cow::from(data)));
                 }
                 Overwrite { key, data } => {
+                    // println!("==========Overwrite==========");
+                    // println!("{:?}", data);
+                    nebula_query.push(data.clone());
                     overwrites
                         .entry(key.entity_type.clone())
                         .or_insert_with(Vec::new)
@@ -1124,6 +1152,12 @@ impl DeploymentStore {
             self.get_conn()?
         };
 
+        // get nebula session
+        let pool_nebula = &self.pool_nebula;
+
+        let mut nebula_query: Vec<Entity> = Vec::new();
+
+
         let event = conn.transaction(|| -> Result<_, StoreError> {
             // Emit a store event for the changes we are about to make. We
             // wait with sending it until we have done all our other work
@@ -1144,6 +1178,7 @@ impl DeploymentStore {
                 mods,
                 block_ptr_to,
                 stopwatch,
+                & mut nebula_query,
             )?;
             section.end();
 
@@ -1177,6 +1212,12 @@ impl DeploymentStore {
 
             Ok(event)
         })?;
+
+
+        println!("=============Vec<Entity>================");
+        for entity in nebula_query{
+            println!("{:?}", entity);
+        }
 
         Ok(event)
     }

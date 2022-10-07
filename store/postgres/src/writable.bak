@@ -257,7 +257,7 @@ impl SyncStore {
         manifest_idx_and_name: &[(u32, String)],
         offchain_to_remove: &[StoredDynamicDataSource],
     ) -> Result<(), StoreError> {
-        let res = self.retry("transact_block_operations", move || {
+        let res = self.retry("transact_block_operations", move || async{
             let event = self.writable.transact_block_operations(
                 self.site.clone(),
                 block_ptr_to,
@@ -268,7 +268,7 @@ impl SyncStore {
                 deterministic_errors,
                 manifest_idx_and_name,
                 offchain_to_remove,
-            )?;
+            ).await?;
 
             let _section = stopwatch.start_section("send_store_event");
             self.try_send_store_event(event)?;

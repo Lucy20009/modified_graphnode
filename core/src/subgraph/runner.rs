@@ -389,6 +389,7 @@ where
             .await
             .context("Failed to transact block operations")?;
 
+
         // For subgraphs with `nonFatalErrors` feature disabled, we consider
         // any error as fatal.
         //

@@ -248,6 +248,7 @@ pub trait WritableStore: ReadStore {
         offchain_to_remove: Vec<StoredDynamicDataSource>,
     ) -> Result<(), StoreError>;
 
+
     /// The deployment `id` finished syncing, mark it as synced in the database
     /// and promote it to the current version in the subgraphs where it was the
     /// pending version so far
