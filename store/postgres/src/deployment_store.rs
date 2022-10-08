@@ -169,9 +169,7 @@ impl DeploymentStore {
             conn_round_robin_counter: AtomicUsize::new(0),
             subgraph_cache: Mutex::new(LruCache::with_capacity(100)),
             layout_cache: LayoutCache::new(ENV_VARS.store.query_stats_refresh_interval),
-            // pool_nebula: pool_nebula,
             pool_nebula,
-
         };
 
         DeploymentStore(Arc::new(store))
@@ -240,15 +238,13 @@ impl DeploymentStore {
             Ok(())
         });
 
-        // println!("===============tables===============");
         for table in tables{
             
-            println!("============={:?}=============", table.object);
-            println!("name: {:?}", table.name);
-            println!("qualified_name: {:?}", table.qualified_name);
-            println!("columns: {:?}", table.columns);
-            println!("immutable: {:?}", table.immutable);
-
+            // println!("============={:?}=============", table.object);
+            // println!("name: {:?}", table.name);
+            // println!("qualified_name: {:?}", table.qualified_name);
+            // println!("columns: {:?}", table.columns);
+            // println!("immutable: {:?}", table.immutable);
 
             // create space
             let mut create_space_query: String = String::from("CREATE SPACE IF NOT EXISTS `");
@@ -363,19 +359,6 @@ impl DeploymentStore {
         Ok(())
     }
 
-    fn get_random_string(len: usize) -> String{
-        let mut rng = rand::thread_rng();
-        let mut test: Vec<u8> = vec![0; len];
-        for i in &mut test{
-            let dig_or_char: u8 = rng.gen_range(0..=1);
-            match dig_or_char{
-                0 => *i = rng.gen_range(48..=57),
-                _ => *i = rng.gen_range(97..=122),
-            }
-        }
-        String::from_utf8(test).unwrap()
-    }
-
     fn apply_entity_modifications(
         &self,
         conn: &PgConnection,
@@ -383,12 +366,8 @@ impl DeploymentStore {
         mods: &[EntityModification],
         ptr: &BlockPtr,
         stopwatch: &StopwatchMetrics,
-        nebula_query: & mut Vec<Entity>,
+        entities: & mut Vec<Entity>
     ) -> Result<i32, StoreError> {
-
-        // get nebula session
-        let pool_nebula = &self.pool_nebula;
-
         use EntityModification::*;
         let mut count = 0;
 
@@ -399,18 +378,18 @@ impl DeploymentStore {
         for modification in mods.into_iter() {
             match modification {
                 Insert { key, data } => {
-                    // println!("==========Insert==========");
-                    // println!("{:?}", data);
-                    nebula_query.push(data.clone());
+
+                    entities.push(data.clone());
+
                     inserts
                         .entry(key.entity_type.clone())
                         .or_insert_with(Vec::new)
                         .push((key, Cow::from(data)));
                 }
                 Overwrite { key, data } => {
-                    // println!("==========Overwrite==========");
-                    // println!("{:?}", data);
-                    nebula_query.push(data.clone());
+
+                    entities.push(data.clone());
+
                     overwrites
                         .entry(key.entity_type.clone())
                         .or_insert_with(Vec::new)
@@ -1135,6 +1114,8 @@ impl DeploymentStore {
             .map(|(entities, _)| entities)
     }
 
+    
+
     pub(crate) fn transact_block_operations(
         &self,
         site: Arc<Site>,
@@ -1152,11 +1133,9 @@ impl DeploymentStore {
             self.get_conn()?
         };
 
-        // get nebula session
         let pool_nebula = &self.pool_nebula;
 
-        let mut nebula_query: Vec<Entity> = Vec::new();
-
+        let mut entities: Vec<Entity> = Vec::new();
 
         let event = conn.transaction(|| -> Result<_, StoreError> {
             // Emit a store event for the changes we are about to make. We
@@ -1178,7 +1157,7 @@ impl DeploymentStore {
                 mods,
                 block_ptr_to,
                 stopwatch,
-                & mut nebula_query,
+                & mut entities,
             )?;
             section.end();
 
@@ -1214,13 +1193,94 @@ impl DeploymentStore {
         })?;
 
 
-        println!("=============Vec<Entity>================");
-        for entity in nebula_query{
-            println!("{:?}", entity);
+        // insert entity into nebula
+        let mut insert_query: Vec<String> = Vec::new();
+        // insert_query.push(String::from("use TokenTransfer;"));
+
+        for eneity in entities{
+
+            let mut keys = String::from("(");
+            let mut values = String::from("(");
+            
+
+            for (k, v) in eneity.0{
+                if keys.len()!= 1 {
+                    keys += ",";
+                }
+                keys += k.as_str();
+                if values.len()!= 1 {
+                    values += ",";
+                }
+                values += v.to_string().as_str();
+            }
+
+            keys += ")";
+            values += ")";
+
+            // println!("key: {}", keys);
+            // println!("value: {}", values);
+            // println!("===============");
+
+            fn get_random_string(len: usize) -> String{
+                let mut rng = rand::thread_rng();
+                let mut test: Vec<u8> = vec![0; len];
+                for i in &mut test{
+                    let dig_or_char: u8 = rng.gen_range(0..=1);
+                    match dig_or_char{
+                        0 => *i = rng.gen_range(48..=57),
+                        _ => *i = rng.gen_range(97..=122),
+                    }
+                }
+                String::from_utf8(test).unwrap()
+            }
+
+            if keys.contains("value"){
+            }else{
+                continue;
+            }
+
+            // INSERT VERTEX transfer (value, to_account, from_account) VALUES "11":("n1", 12);
+            // INSERT VERTEX transfer 
+            let mut query = String::from("use TokenTransfer;INSERT VERTEX transfer ");
+
+            // INSERT VERTEX transfer (value, to_account, from_account)
+            let keys = keys.replace("id", "from_account");
+            let keys = keys.replace("to", "to_account");
+            query += keys.as_str();
+            // INSERT VERTEX transfer (value, to_account, from_account) VALUES "
+            query += " VALUES \"";
+            // INSERT VERTEX transfer (value, to_account, from_account) VALUES "11
+            query += get_random_string(10).as_str();
+            //INSERT VERTEX transfer (value, to_account, from_account) VALUES "11":
+            query += "\":";
+            // INSERT VERTEX transfer (value, to_account, from_account) VALUES "11":("n1", 12)
+            query += values.as_str();
+            query += ";";
+            insert_query.push(query);
+
         }
+
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async {
+                // println!("===========test=================");                
+                // pool_nebula.create_new_connection().await;
+
+                let session = pool_nebula.get_session(true).await.unwrap();
+        
+                for query in insert_query{
+                    println!("{}", query);
+                    let _resp = session.execute(query.as_str()).await.unwrap();
+                }
+            });
+
 
         Ok(event)
     }
+
+
 
     fn rewind_with_conn(
         &self,

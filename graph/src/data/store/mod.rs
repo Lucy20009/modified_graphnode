@@ -183,6 +183,32 @@ pub enum Value {
     BigInt(scalar::BigInt),
 }
 
+impl Value {
+    pub fn to_string(&self) -> String{
+        match self{
+            Value::String(value) => {
+                let mut res = String::from("\"");
+                res += value.clone().as_str();
+                res += "\"";
+                res
+            },
+            Value::Int(value) => value.to_string(),
+            Value::BigDecimal(value) => value.to_string(),
+            Value::Bool(value) => value.to_string(),
+            Value::List(values) => {
+                let mut res = String::from("");
+                for value in values{
+                    res += value.to_string().as_str();
+                }
+                res
+            }
+            Value::Null => String::from("Null"),
+            Value::Bytes(value) => value.to_string(),
+            Value::BigInt(value) => value.to_string(),
+        }
+    }
+}
+
 impl stable_hash_legacy::StableHash for Value {
     fn stable_hash<H: stable_hash_legacy::StableHasher>(
         &self,
@@ -581,7 +607,7 @@ where
 
 /// An entity is represented as a map of attribute names to values.
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
-pub struct Entity(HashMap<Attribute, Value>);
+pub struct Entity(pub HashMap<Attribute, Value>);
 
 impl stable_hash_legacy::StableHash for Entity {
     #[inline]

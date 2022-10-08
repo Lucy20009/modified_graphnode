@@ -33,9 +33,6 @@ impl Layout {
             table.as_ddl(&mut out, self)?;
         }
 
-        println!("==================out====================");
-        println!("{:?}", out);
-
         Ok(out)
     }
 
