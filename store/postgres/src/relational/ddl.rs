@@ -87,13 +87,6 @@ impl Table {
                 column.as_ddl(&mut cols)?;
                 first = false;
             }
-
-
-            println!("==================cols================");
-            println!("{:?}", cols);
-
-
-
             Ok(cols)
         }
 

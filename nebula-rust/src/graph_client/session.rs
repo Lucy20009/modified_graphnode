@@ -4,8 +4,13 @@
  * attached with Common Clause Condition 1.0, found in the LICENSES directory.
  */
 
+use std::collections::HashMap;
+
 use crate::graph_client::connection::Connection;
 use crate::graph_client::connection_pool::ConnectionPool_nebula;
+use crate::graph_client::nebula_schema::Tag;
+use crate::graph_client::nebula_schema::ColType;
+use crate::graph_client::nebula_schema::InsertTagQuery;
 
 pub struct Session<'a> {
     session_id: i64,
@@ -59,7 +64,6 @@ impl<'a> Session<'a> {
         &self,
         query: &str,
     ) -> std::result::Result<graph::types::ExecutionResponse, common::types::ErrorCode> {
-        println!("{:?}", query);
         self.conn.execute(self.session_id, query).await
     }
 
@@ -80,6 +84,189 @@ impl<'a> Session<'a> {
     #[inline]
     pub fn offset_secs(&self) -> i32 {
         self.offset_secs
+    }
+    #[inline]
+    pub async fn show_spaces(&self){
+        let query = "show spaces;";
+        let resp = self.execute(query).await.unwrap();
+        resp.show_data();
+    }
+
+    #[inline]
+    // CREATE SPACE `testGraph` (partition_num = 15, replica_factor = 1, vid_type = FIXED_STRING(50)) COMMENT = "this is a graph for test"
+    pub async fn create_space(&self, space_name: &str, partition_num: u8, replica_factor: u8, is_fixed_string: bool, fixed_string_len: u8, comment: &str){
+        let mut query = String::from("CREATE SPACE IF NOT EXISTS `");
+        query += space_name;
+        query += "` (partition_num = ";
+        query += partition_num.to_string().as_str();
+        query += ", replica_factor = ";
+        query += replica_factor.to_string().as_str();
+        query += ", vid_type = ";
+        if is_fixed_string{
+            query += "FIXED_STRING(";
+            query += fixed_string_len.to_string().as_str();
+            query += "))";
+        }else{
+            query += "INT64)";
+        }
+        if comment!=""{
+            query += " COMMENT = \"";
+            query += comment;
+            query += "\"";
+        }
+        query += ";";
+        println!("{}", query);
+        let _resp = self.execute(query.as_str()).await.unwrap();
+        println!("{:?}", _resp);
+    }
+
+    #[inline]
+    pub async fn create_tag_or_edge(&self, space_name: &str, col_type: ColType, tag_name: &str, comment: &str, tags: Vec<Tag>){
+        let mut query = String::from("use ");
+        query += space_name;
+        query += "; CREATE ";
+        query += col_type.to_string().as_str();
+        query += " IF NOT EXISTS `";
+        query += tag_name;
+        query += "` (";
+        for i in 0..tags.len() {
+            query += tags[i].to_string().as_str();
+            if i!=tags.len()-1{
+                query += ",";
+            }
+        }
+        query += ")";
+        if comment!="".to_string(){
+            query += " COMMENT = \"";
+            query += comment;
+            query += "\"";
+        }
+        query += ";";
+
+        println!("{}", query);
+
+        let _resp = self.execute(query.as_str()).await.unwrap();
+
+        println!("{:?}", _resp);
+    }
+
+    #[inline]
+    // INSERT VERTEX t2 (name, age) VALUES "11":("n1", 12);
+    pub async fn insert_tag(&self, space_name: &str, tag_name: &str, kv: HashMap<String, String>, vid: &str){
+        let mut query = String::from("use ");
+        query += space_name;
+        query += "; ";
+        query += "INSERT VERTEX ";
+        query += tag_name;
+        query += " ";
+        let mut keys = String::from("(");
+        let mut values = String::from("(");
+        for (k,v) in kv{
+            if keys.len()!=1{
+                keys += ",";
+                values += ",";
+            }
+            keys += k.as_str();
+            values += v.as_str();
+        }
+        keys += ")";
+        values += ")";
+        query += keys.as_str();
+        query += " VALUES \"";
+        query += vid;
+        query += "\":";
+        query += values.as_str();
+        query += ";";
+
+        println!("{}", query);
+        let _resp = self.execute(query.as_str()).await.unwrap();
+        println!("{:?}", _resp);
+    }
+
+    #[inline]
+    pub async fn insert_tags(&self, insert_tag_queries: Vec<InsertTagQuery>){
+        for query in insert_tag_queries{
+            let _resp = self.insert_tag(query.space_name.as_str(), query.tag_name.as_str(), query.kv, query.vid.as_str()).await;
+        }
+    }
+
+    #[inline]
+    // INSERT EDGE e2 (name, age) VALUES "11"->"13":("n1", 12);
+    pub async fn insert_edge(&self, space_name: &str, edge_name: &str, kv: HashMap<String, String>, from_vertex: &str, to_vertex: &str){
+        let mut query = String::from("use ");
+        query += space_name;
+        query += "; ";
+        query += "INSERT EDGE ";
+        query += edge_name;
+        query += " ";
+        let mut keys = String::from("(");
+        let mut values = String::from("(");
+        for (k,v) in kv{
+            if keys.len()!=1{
+                keys += ",";
+                values += ",";
+            }
+            keys += k.as_str();
+            values += v.as_str();
+        }
+        keys += ")";
+        values += ")";
+        query += keys.as_str();
+        query += " VALUES \"";
+        query += from_vertex;
+        query += "\" -> \"";
+        query += to_vertex;
+        query += "\":";
+        query += values.as_str();
+        query += ";";
+
+        println!("{}", query);
+        let _resp = self.execute(query.as_str()).await.unwrap();
+    }
+
+    #[inline]
+    // CREATE TAG INDEX `index_tag` on `stu`      (`name`(10), `age`) COMMENT "this is an index for tag"
+    pub async fn create_index(&self, space_name: &str, index_type: ColType, tag_or_edge_name: &str, index_name: &str, comment: &str, indexed_properties: HashMap<String, u8>){
+        let mut query = String::from("use ");
+        query += space_name;
+        query += "; ";
+        query += "CREATE ";
+        query += index_type.to_string().as_str();
+        query += " INDEX `";
+        query += index_name;
+        query += "` on `";
+        query += tag_or_edge_name;
+        query += "`(";
+
+        let mut properties = String::from("");
+        for (k,v) in indexed_properties {
+            if properties.len()!=0{
+                properties += ",";
+            }
+            let mut property = String::from("`");
+            property += k.as_str();
+            property += "`";
+            if v==0 {
+            }else{
+                property += "(";
+                property += v.to_string().as_str();
+                property += ")"
+            }
+            properties += property.as_str();
+        }
+
+        query += properties.as_str();
+        query += ") ";
+        if comment!=""{
+            query += "COMMENT \"";
+            query += comment;
+            query += "\"";
+        }
+        query += ";";
+
+        println!("{}", query);
+        let _resp = self.execute(query.as_str()).await.unwrap();
+        println!("{:?}", _resp);
     }
 }
 

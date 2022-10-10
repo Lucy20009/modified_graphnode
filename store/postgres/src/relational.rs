@@ -53,7 +53,7 @@ use graph::prelude::{
     EntityFilter, EntityOperation, EntityOrder, EntityRange, Logger, QueryExecutionError,
     StoreError, StoreEvent, ValueType, BLOCK_NUMBER_MAX,
 };
-use nebula_rust::graph_client::{pool_config, connection_pool, session};
+use nebula_rust::graph_client::{pool_config, connection_pool, session, nebula_schema::{ColType, Tag, DataType}};
 
 use crate::block_range::{BLOCK_COLUMN, BLOCK_RANGE_COLUMN};
 pub use crate::catalog::Catalog;
@@ -968,6 +968,17 @@ impl From<IdType> for ColumnType {
 }
 
 impl ColumnType {
+    pub fn to_nebula_type(&self) -> DataType{
+        match self{
+            ColumnType::Boolean => DataType::Bool,
+            ColumnType::BigDecimal => DataType::Double,
+            ColumnType::BigInt => DataType::Int32,
+            ColumnType::Bytes => DataType::String,
+            ColumnType::Int => DataType::Int8,
+            ColumnType::String => DataType::String,
+            _ => DataType::Bool,
+        }
+    }
     fn from_field_type(
         field_type: &q::Type,
         catalog: &Catalog,

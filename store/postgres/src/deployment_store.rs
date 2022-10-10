@@ -1,3 +1,4 @@
+use blake3::Hash;
 use detail::DeploymentDetail;
 use diesel::connection::SimpleConnection;
 use diesel::pg::PgConnection;
@@ -37,7 +38,7 @@ use graph::prelude::{
 };
 use graph_graphql::prelude::api_schema;
 use web3::types::Address;
-use nebula_rust::graph_client::{pool_config, connection_pool, session};
+use nebula_rust::graph_client::{pool_config, connection_pool, session, nebula_schema::{ColType, Tag, DataType, InsertTagQuery}};
 use rand::Rng;
 
 use crate::block_range::block_number;
@@ -247,26 +248,58 @@ impl DeploymentStore {
             // println!("immutable: {:?}", table.immutable);
 
             // create space
-            let mut create_space_query: String = String::from("CREATE SPACE IF NOT EXISTS `");
-            create_space_query = create_space_query + table.object.as_str() + "` (partition_num = 1, replica_factor = 1, vid_type = FIXED_STRING(50));";
-            // let _resp = session.execute(create_space_query.as_str()).await.unwrap();
-
-            // use space
-            let mut use_space_query: String = String::from("use `");
-            use_space_query = use_space_query + table.object.as_str() + "`;";
-            // let _resp = session.execute(use_space_query.as_str()).await.unwrap();
+            session.create_space(table.object.as_str(), 1, 1, true, 50, "").await;
+            std::thread::sleep(std::time::Duration::from_millis(5000));
 
             // create tag
-            let create_tag_query = "CREATE tag IF NOT EXISTS `transfer` (`from_account` string NOT NULL  , `to_account` string NOT NULL  , `value` int32 NOT NULL  );";
-            // let _resp = session.execute(create_tag_query).await.unwrap();
+            let space_name = table.object.as_str();
+            let col_type = ColType::Tag;
+            let mut tag_name = String::from(table.object.as_str()) + "_";
+            tag_name += ColType::Tag.to_string().as_str();
+            let tag_name = tag_name.as_str();
+            let comment = "";
+            let mut tags: Vec<Tag> = Vec::new();
+            for column in &table.columns{
+                // property_name: String,
+                // data_type: DataType,
+                // allow_null: bool,
+                // defaults: String,
+                // comment: String,
+                if column.name.as_str()=="id"{
+                    continue;
+                }
+                let property_name = column.name.as_str();
+                let data_type = column.column_type.to_nebula_type();
+                let allow_null = false;
+                let defaults = "";
+                let comment = "";
+                let tag = Tag::new(property_name, data_type, allow_null, defaults, comment);
+                tags.push(tag);
+            }
+            session.create_tag_or_edge(space_name, col_type, tag_name, comment, tags).await;
+            std::thread::sleep(std::time::Duration::from_millis(5000));
 
-            let query = create_space_query + use_space_query.as_str() + create_tag_query;
-            let _resp = session.execute(query.as_str()).await.unwrap();
+
+            // let mut create_space_query: String = String::from("CREATE SPACE IF NOT EXISTS `");
+            // create_space_query = create_space_query + table.object.as_str() + "` (partition_num = 1, replica_factor = 1, vid_type = FIXED_STRING(50));";
+            // // let _resp = session.execute(create_space_query.as_str()).await.unwrap();
+
+            // // use space
+            // let mut use_space_query: String = String::from("use `");
+            // use_space_query = use_space_query + table.object.as_str() + "`;";
+            // // let _resp = session.execute(use_space_query.as_str()).await.unwrap();
+
+            // // create tag
+            // let create_tag_query = "CREATE tag IF NOT EXISTS `transfer` (`from_account` string NOT NULL  , `to_account` string NOT NULL  , `value` int32 NOT NULL  );";
+            // // let _resp = session.execute(create_tag_query).await.unwrap();
+
+            // let query = create_space_query + use_space_query.as_str() + create_tag_query;
+            // let _resp = session.execute(query.as_str()).await.unwrap();
         }
 
         res
-        
     }
+        
 
     pub(crate) fn load_deployment(
         &self,
@@ -366,7 +399,7 @@ impl DeploymentStore {
         mods: &[EntityModification],
         ptr: &BlockPtr,
         stopwatch: &StopwatchMetrics,
-        entities: & mut Vec<Entity>
+        entities: & mut Vec<EntityWithTag>
     ) -> Result<i32, StoreError> {
         use EntityModification::*;
         let mut count = 0;
@@ -379,7 +412,12 @@ impl DeploymentStore {
             match modification {
                 Insert { key, data } => {
 
-                    entities.push(data.clone());
+                    // println!("============Insert key==============");
+                    // println!("{:?}", key);
+                    // println!("============Insert data==============");
+                    // println!("{:?}", data);
+
+                    entities.push(EntityWithTag::new(key.entity_type.to_string(), data.clone()));
 
                     inserts
                         .entry(key.entity_type.clone())
@@ -388,7 +426,12 @@ impl DeploymentStore {
                 }
                 Overwrite { key, data } => {
 
-                    entities.push(data.clone());
+                    // println!("============Overwrite key==============");
+                    // println!("{:?}", key);
+                    // println!("============Overwrite data==============");
+                    // println!("{:?}", data);
+
+                    entities.push(EntityWithTag::new(key.entity_type.to_string(), data.clone()));
 
                     overwrites
                         .entry(key.entity_type.clone())
@@ -1135,7 +1178,7 @@ impl DeploymentStore {
 
         let pool_nebula = &self.pool_nebula;
 
-        let mut entities: Vec<Entity> = Vec::new();
+        let mut entities: Vec<EntityWithTag> = Vec::new();
 
         let event = conn.transaction(|| -> Result<_, StoreError> {
             // Emit a store event for the changes we are about to make. We
@@ -1192,18 +1235,61 @@ impl DeploymentStore {
             Ok(event)
         })?;
 
+        fn get_random_string(len: usize) -> String{
+            let mut rng = rand::thread_rng();
+            let mut test: Vec<u8> = vec![0; len];
+            for i in &mut test{
+                let dig_or_char: u8 = rng.gen_range(0..=1);
+                match dig_or_char{
+                    0 => *i = rng.gen_range(48..=57),
+                    _ => *i = rng.gen_range(97..=122),
+                }
+            }
+            String::from_utf8(test).unwrap()
+        }
 
+
+        let mut insert_tag_queries: Vec<InsertTagQuery> = Vec::new();
+
+        for entity in entities{
+            let mut properties: HashMap<String, String> = HashMap::new();
+            for (k,v) in entity.entity.0{
+                if k==String::from("id"){
+                    continue;
+                }
+                properties.insert(k, v.to_string());
+            }
+            let space_name = entity.space_name.clone();
+            let tag_name = entity.space_name + "_tag";
+            let vid = get_random_string(20);
+
+            let insert_tag_query = InsertTagQuery::new(space_name, tag_name, properties, vid);
+            insert_tag_queries.push(insert_tag_query);
+        }
+
+        tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async {
+            let session = pool_nebula.get_session(true).await.unwrap();
+            session.insert_tags(insert_tag_queries).await;
+        });
+        /* 
         // insert entity into nebula
         let mut insert_query: Vec<String> = Vec::new();
         // insert_query.push(String::from("use TokenTransfer;"));
 
-        for eneity in entities{
+        for item in entities{
 
             let mut keys = String::from("(");
             let mut values = String::from("(");
             
 
-            for (k, v) in eneity.0{
+            for (k, v) in item.entity.0{
+                if k==String::from("id"){
+                    continue;
+                }
                 if keys.len()!= 1 {
                     keys += ",";
                 }
@@ -1276,6 +1362,7 @@ impl DeploymentStore {
                 }
             });
 
+            */
 
         Ok(event)
     }
@@ -1790,4 +1877,20 @@ fn resolve_column_names<'a, T: AsRef<str>>(
                 .map(|column| column.name.as_str())
         })
         .collect()
+}
+
+pub struct EntityWithTag{
+    pub space_name: String,
+    pub entity: Entity,
+}
+impl EntityWithTag{
+    pub fn new(
+        space_name: String,
+        entity: Entity, 
+    ) -> Self{
+        EntityWithTag{
+            space_name,
+            entity,
+        }
+    }
 }

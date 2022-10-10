@@ -180,7 +180,7 @@ pub async fn create_subgraph(
         NODE_ID.clone(),
         NETWORK_NAME.to_string(),
         SubgraphVersionSwitchingMode::Instant,
-    )?;
+    ).await?;
 
     SUBGRAPH_STORE
         .cheap_clone()
