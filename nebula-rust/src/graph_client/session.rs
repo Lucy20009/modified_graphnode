@@ -11,6 +11,7 @@ use crate::graph_client::connection_pool::ConnectionPool_nebula;
 use crate::graph_client::nebula_schema::Tag;
 use crate::graph_client::nebula_schema::ColType;
 use crate::graph_client::nebula_schema::InsertTagQuery;
+use crate::graph_client::nebula_schema::InsertEdgeQueryWithRank;
 
 pub struct Session<'a> {
     session_id: i64,
@@ -93,8 +94,7 @@ impl<'a> Session<'a> {
     }
 
     #[inline]
-    // CREATE SPACE `testGraph` (partition_num = 15, replica_factor = 1, vid_type = FIXED_STRING(50)) COMMENT = "this is a graph for test"
-    pub async fn create_space(&self, space_name: &str, partition_num: u8, replica_factor: u8, is_fixed_string: bool, fixed_string_len: u8, comment: &str){
+    pub fn get_create_space_query(&self, space_name: &str, partition_num: u8, replica_factor: u8, is_fixed_string: bool, fixed_string_len: u8, comment: &str) -> String{
         let mut query = String::from("CREATE SPACE IF NOT EXISTS `");
         query += space_name;
         query += "` (partition_num = ";
@@ -115,13 +115,19 @@ impl<'a> Session<'a> {
             query += "\"";
         }
         query += ";";
-        println!("{}", query);
+        query
+    }
+    #[inline]
+    // CREATE SPACE `testGraph` (partition_num = 15, replica_factor = 1, vid_type = FIXED_STRING(50)) COMMENT = "this is a graph for test"
+    pub async fn create_space(&self, space_name: &str, partition_num: u8, replica_factor: u8, is_fixed_string: bool, fixed_string_len: u8, comment: &str){
+        let query = self.get_create_space_query(space_name, partition_num, replica_factor, is_fixed_string, fixed_string_len, comment);
+        // println!("{}", query);
         let _resp = self.execute(query.as_str()).await.unwrap();
-        println!("{:?}", _resp);
+        //println!("{:?}", _resp);
     }
 
     #[inline]
-    pub async fn create_tag_or_edge(&self, space_name: &str, col_type: ColType, tag_name: &str, comment: &str, tags: Vec<Tag>){
+    pub fn get_create_tag_or_edge(&self, space_name: &str, col_type: ColType, tag_name: &str, comment: &str, tags: Vec<Tag>) -> String{
         let mut query = String::from("use ");
         query += space_name;
         query += "; CREATE ";
@@ -142,12 +148,18 @@ impl<'a> Session<'a> {
             query += "\"";
         }
         query += ";";
+        query
+    }
 
-        println!("{}", query);
+    #[inline]
+    pub async fn create_tag_or_edge(&self, space_name: &str, col_type: ColType, tag_name: &str, comment: &str, tags: Vec<Tag>){
+
+        let query = self.get_create_tag_or_edge(space_name, col_type, tag_name, comment, tags);
+        //println!("{}", query);
 
         let _resp = self.execute(query.as_str()).await.unwrap();
 
-        println!("{:?}", _resp);
+        //println!("{:?}", _resp);
     }
 
     #[inline]
@@ -156,7 +168,7 @@ impl<'a> Session<'a> {
         let mut query = String::from("use ");
         query += space_name;
         query += "; ";
-        query += "INSERT VERTEX ";
+        query += "INSERT VERTEX IF NOT EXISTS ";
         query += tag_name;
         query += " ";
         let mut keys = String::from("(");
@@ -186,7 +198,14 @@ impl<'a> Session<'a> {
     #[inline]
     pub async fn insert_tags(&self, insert_tag_queries: Vec<InsertTagQuery>){
         for query in insert_tag_queries{
-            let _resp = self.insert_tag(query.space_name.as_str(), query.tag_name.as_str(), query.kv, query.vid.as_str()).await;
+            self.insert_tag(query.space_name.as_str(), query.tag_name.as_str(), query.kv, query.vid.as_str()).await;
+        }
+    }
+
+    #[inline]
+    pub async fn insert_edges(&self, insert_edge_queries: Vec<InsertEdgeQueryWithRank>){
+        for query in insert_edge_queries{
+            self.insert_edge_with_rank(query.space_name.as_str(), query.edge_name.as_str(), query.kv, query.from_vertex.as_str(), query.to_vertex.as_str(), query.rank).await;
         }
     }
 
@@ -196,7 +215,7 @@ impl<'a> Session<'a> {
         let mut query = String::from("use ");
         query += space_name;
         query += "; ";
-        query += "INSERT EDGE ";
+        query += "INSERT EDGE IF NOT EXISTS ";
         query += edge_name;
         query += " ";
         let mut keys = String::from("(");
@@ -222,6 +241,44 @@ impl<'a> Session<'a> {
 
         println!("{}", query);
         let _resp = self.execute(query.as_str()).await.unwrap();
+    }
+
+
+    #[inline]
+    // INSERT EDGE e2 (name, age) VALUES "11"->"13"@1:("n1", 12);
+    pub async fn insert_edge_with_rank(&self, space_name: &str, edge_name: &str, kv: HashMap<String, String>, from_vertex: &str, to_vertex: &str, rank: i32){
+        let mut query = String::from("use ");
+        query += space_name;
+        query += "; ";
+        query += "INSERT EDGE IF NOT EXISTS ";
+        query += edge_name;
+        query += " ";
+        let mut keys = String::from("(");
+        let mut values = String::from("(");
+        for (k,v) in kv{
+            if keys.len()!=1{
+                keys += ",";
+                values += ",";
+            }
+            keys += k.as_str();
+            values += v.as_str();
+        }
+        keys += ")";
+        values += ")";
+        query += keys.as_str();
+        query += " VALUES \"";
+        query += from_vertex;
+        query += "\" -> \"";
+        query += to_vertex;
+        query += "\"@";
+        query += rank.to_string().as_str();
+        query += ":";
+        query += values.as_str();
+        query += ";";
+
+        println!("{}", query);
+        let _resp = self.execute(query.as_str()).await.unwrap();
+        println!("{:?}", _resp);
     }
 
     #[inline]

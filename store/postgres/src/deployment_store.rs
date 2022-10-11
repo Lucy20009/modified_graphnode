@@ -38,7 +38,7 @@ use graph::prelude::{
 };
 use graph_graphql::prelude::api_schema;
 use web3::types::Address;
-use nebula_rust::graph_client::{pool_config, connection_pool, session, nebula_schema::{ColType, Tag, DataType, InsertTagQuery}};
+use nebula_rust::graph_client::{pool_config, connection_pool, session, nebula_schema::{ColType, Tag, DataType, InsertTagQuery, InsertEdgeQueryWithRank}};
 use rand::Rng;
 
 use crate::block_range::block_number;
@@ -247,11 +247,16 @@ impl DeploymentStore {
             // println!("columns: {:?}", table.columns);
             // println!("immutable: {:?}", table.immutable);
 
+            let mut all_queries = String::from("");
+
             // create space
-            session.create_space(table.object.as_str(), 1, 1, true, 50, "").await;
-            std::thread::sleep(std::time::Duration::from_millis(5000));
+            // session.create_space(table.object.as_str(), 1, 1, true, 50, "").await;
+            // std::thread::sleep(std::time::Duration::from_millis(5000));
+
+            all_queries += session.get_create_space_query(table.object.as_str(), 1, 1, true, 50, "").as_str();
 
             // create tag
+            // only create one property (id)
             let space_name = table.object.as_str();
             let col_type = ColType::Tag;
             let mut tag_name = String::from(table.object.as_str()) + "_";
@@ -265,7 +270,7 @@ impl DeploymentStore {
                 // allow_null: bool,
                 // defaults: String,
                 // comment: String,
-                if column.name.as_str()=="id"{
+                if column.name.as_str()!="id"{
                     continue;
                 }
                 let property_name = column.name.as_str();
@@ -276,10 +281,30 @@ impl DeploymentStore {
                 let tag = Tag::new(property_name, data_type, allow_null, defaults, comment);
                 tags.push(tag);
             }
-            session.create_tag_or_edge(space_name, col_type, tag_name, comment, tags).await;
+            // session.create_tag_or_edge(space_name, col_type, tag_name, comment, tags).await;
+            // std::thread::sleep(std::time::Duration::from_millis(5000));
+
+            all_queries += session.get_create_tag_or_edge(space_name, col_type, tag_name, comment, tags).as_str();
+
+            // create edge (custom)
+            if table.object.as_str() == "TokenTransfer"{
+                let space_name = table.object.as_str();
+                let col_type = ColType::Edge;
+                let tag_name = "tx";
+                let comment = "";
+                let mut tags: Vec<Tag> = Vec::new();
+                tags.push(Tag::new("from_account", DataType::String, false, "", ""));
+                tags.push(Tag::new("to_account", DataType::String, false, "", ""));
+                tags.push(Tag::new("value", DataType::Int32, false, "", ""));
+                // session.create_tag_or_edge(space_name, col_type, tag_name, comment, tags).await;
+                // std::thread::sleep(std::time::Duration::from_millis(5000));
+
+                all_queries += session.get_create_tag_or_edge(space_name, col_type, tag_name, comment, tags).as_str();
+            }
+
+
+            let _resp = session.execute(all_queries.as_str()).await.unwrap();
             std::thread::sleep(std::time::Duration::from_millis(5000));
-
-
             // let mut create_space_query: String = String::from("CREATE SPACE IF NOT EXISTS `");
             // create_space_query = create_space_query + table.object.as_str() + "` (partition_num = 1, replica_factor = 1, vid_type = FIXED_STRING(50));";
             // // let _resp = session.execute(create_space_query.as_str()).await.unwrap();
@@ -1248,23 +1273,40 @@ impl DeploymentStore {
             String::from_utf8(test).unwrap()
         }
 
+        fn get_random_int(min: i32, max: i32) -> i32{
+            let mut rng = rand::thread_rng();
+            let res: i32 = rng.gen_range(min..=max);
+            res
+        }
 
+        // insert tag
         let mut insert_tag_queries: Vec<InsertTagQuery> = Vec::new();
 
-        for entity in entities{
-            let mut properties: HashMap<String, String> = HashMap::new();
-            for (k,v) in entity.entity.0{
-                if k==String::from("id"){
-                    continue;
+        for entity in &entities{
+
+            if entity.space_name == String::from("Poi$"){
+                continue;
+            }
+
+            let mut properties_from: HashMap<String, String> = HashMap::new();
+            let mut properties_to: HashMap<String, String> = HashMap::new();
+            for (k,v) in &entity.entity.0{
+                // (id) VALUES "from_account"(from_account)
+                if k.clone()==String::from("from_account"){
+                    properties_from.insert("id".to_string(), v.clone().to_string());
                 }
-                properties.insert(k, v.to_string());
+                else if k.clone()==String::from("to_account"){
+                    properties_to.insert("id".to_string(), v.clone().to_string());
+                }
             }
             let space_name = entity.space_name.clone();
-            let tag_name = entity.space_name + "_tag";
-            let vid = get_random_string(20);
-
-            let insert_tag_query = InsertTagQuery::new(space_name, tag_name, properties, vid);
-            insert_tag_queries.push(insert_tag_query);
+            let tag_name = space_name.clone() + "_tag";
+            let vid_from = properties_from.get("id").unwrap().clone().replace("\"", "");
+            let vid_to = properties_to.get("id").unwrap().clone().replace("\"", "");
+            let insert_tag_query_from = InsertTagQuery::new(space_name.clone(), tag_name.clone(), properties_from, vid_from);
+            let insert_tag_query_to = InsertTagQuery::new(space_name, tag_name, properties_to, vid_to);
+            insert_tag_queries.push(insert_tag_query_from);
+            insert_tag_queries.push(insert_tag_query_to);
         }
 
         tokio::runtime::Builder::new_multi_thread()
@@ -1275,6 +1317,44 @@ impl DeploymentStore {
             let session = pool_nebula.get_session(true).await.unwrap();
             session.insert_tags(insert_tag_queries).await;
         });
+
+ /*        // insert edge
+        let mut insert_edge_queries: Vec<InsertEdgeQueryWithRank> = Vec::new();
+
+        for entity in &entities{
+            let mut properties: HashMap<String, String> = HashMap::new();
+            for (k,v) in &entity.entity.0{
+                if k.clone()==String::from("id"){
+                    continue;
+                }
+                properties.insert(k.clone(), v.to_string());
+            }
+            let space_name = entity.space_name.clone();
+            let from_vertex = properties.get("from_account").unwrap().clone();
+            let to_vertex = properties.get("to_account").unwrap().clone();
+
+            let insert_edge_query = InsertEdgeQueryWithRank::new(
+                space_name,
+                "tx".to_string(),
+                properties,
+                from_vertex,
+                to_vertex,
+                get_random_int(1, 2147483647)
+            );
+            insert_edge_queries.push(insert_edge_query);
+        }
+
+        tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async {
+            let session = pool_nebula.get_session(true).await.unwrap();
+            session.insert_edges(insert_edge_queries).await;
+        });
+
+        */
+
         /* 
         // insert entity into nebula
         let mut insert_query: Vec<String> = Vec::new();

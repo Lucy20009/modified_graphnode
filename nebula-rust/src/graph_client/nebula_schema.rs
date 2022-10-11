@@ -142,3 +142,62 @@ impl InsertTagQuery{
         query
     }
 }
+
+pub struct InsertEdgeQueryWithRank{
+    pub space_name: String, 
+    pub edge_name: String, 
+    pub kv: HashMap<String, String>, 
+    pub from_vertex: String, 
+    pub to_vertex: String,
+    pub rank: i32,
+}
+impl InsertEdgeQueryWithRank{
+    pub fn new(
+        space_name: String, 
+        edge_name: String, 
+        kv: HashMap<String, String>, 
+        from_vertex: String, 
+        to_vertex: String,
+        rank: i32,
+    ) -> Self{
+        InsertEdgeQueryWithRank{
+            space_name,
+            edge_name, 
+            kv, 
+            from_vertex, 
+            to_vertex,
+            rank,
+        }
+    }
+    pub fn to_string(&self)-> String{
+        let mut query = String::from("use ");
+        query += self.space_name.as_str();
+        query += "; ";
+        query += "INSERT EDGE IF NOT EXISTS ";
+        query += self.edge_name.as_str();
+        query += " ";
+        let mut keys = String::from("(");
+        let mut values = String::from("(");
+        for (k,v) in &self.kv{
+            if keys.len()!=1{
+                keys += ",";
+                values += ",";
+            }
+            keys += k.as_str();
+            values += v.as_str();
+        }
+        keys += ")";
+        values += ")";
+        query += keys.as_str();
+        query += " VALUES \"";
+        query += self.from_vertex.as_str();
+        query += "\" -> \"";
+        query += self.to_vertex.as_str();
+        query += "\"@";
+        query += self.rank.to_string().as_str();
+        query += ":";
+        query += values.as_str();
+        query += ";";
+        query
+    }
+}
