@@ -241,11 +241,9 @@ impl DeploymentStore {
 
         for table in tables{
             
-            // println!("============={:?}=============", table.object);
-            // println!("name: {:?}", table.name);
-            // println!("qualified_name: {:?}", table.qualified_name);
-            // println!("columns: {:?}", table.columns);
-            // println!("immutable: {:?}", table.immutable);
+            if table.object.to_string() == String::from("Poi$"){
+                continue;
+            }
 
             let mut all_queries = String::from("");
 
@@ -265,11 +263,6 @@ impl DeploymentStore {
             let comment = "";
             let mut tags: Vec<Tag> = Vec::new();
             for column in &table.columns{
-                // property_name: String,
-                // data_type: DataType,
-                // allow_null: bool,
-                // defaults: String,
-                // comment: String,
                 if column.name.as_str()!="id"{
                     continue;
                 }
@@ -305,21 +298,6 @@ impl DeploymentStore {
 
             let _resp = session.execute(all_queries.as_str()).await.unwrap();
             std::thread::sleep(std::time::Duration::from_millis(5000));
-            // let mut create_space_query: String = String::from("CREATE SPACE IF NOT EXISTS `");
-            // create_space_query = create_space_query + table.object.as_str() + "` (partition_num = 1, replica_factor = 1, vid_type = FIXED_STRING(50));";
-            // // let _resp = session.execute(create_space_query.as_str()).await.unwrap();
-
-            // // use space
-            // let mut use_space_query: String = String::from("use `");
-            // use_space_query = use_space_query + table.object.as_str() + "`;";
-            // // let _resp = session.execute(use_space_query.as_str()).await.unwrap();
-
-            // // create tag
-            // let create_tag_query = "CREATE tag IF NOT EXISTS `transfer` (`from_account` string NOT NULL  , `to_account` string NOT NULL  , `value` int32 NOT NULL  );";
-            // // let _resp = session.execute(create_tag_query).await.unwrap();
-
-            // let query = create_space_query + use_space_query.as_str() + create_tag_query;
-            // let _resp = session.execute(query.as_str()).await.unwrap();
         }
 
         res
@@ -1273,21 +1251,18 @@ impl DeploymentStore {
             String::from_utf8(test).unwrap()
         }
 
-        fn get_random_int(min: i32, max: i32) -> i32{
+        fn get_random_int(min: i64, max: i64) -> i64{
             let mut rng = rand::thread_rng();
-            let res: i32 = rng.gen_range(min..=max);
+            let res: i64 = rng.gen_range(min..=max);
             res
         }
 
         // insert tag
         let mut insert_tag_queries: Vec<InsertTagQuery> = Vec::new();
-
         for entity in &entities{
-
             if entity.space_name == String::from("Poi$"){
                 continue;
             }
-
             let mut properties_from: HashMap<String, String> = HashMap::new();
             let mut properties_to: HashMap<String, String> = HashMap::new();
             for (k,v) in &entity.entity.0{
@@ -1309,19 +1284,13 @@ impl DeploymentStore {
             insert_tag_queries.push(insert_tag_query_to);
         }
 
-        tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-        .unwrap()
-        .block_on(async {
-            let session = pool_nebula.get_session(true).await.unwrap();
-            session.insert_tags(insert_tag_queries).await;
-        });
 
- /*        // insert edge
+        // insert edge
         let mut insert_edge_queries: Vec<InsertEdgeQueryWithRank> = Vec::new();
-
         for entity in &entities{
+            if entity.space_name == String::from("Poi$"){
+                continue;
+            }
             let mut properties: HashMap<String, String> = HashMap::new();
             for (k,v) in &entity.entity.0{
                 if k.clone()==String::from("id"){
@@ -1330,119 +1299,29 @@ impl DeploymentStore {
                 properties.insert(k.clone(), v.to_string());
             }
             let space_name = entity.space_name.clone();
-            let from_vertex = properties.get("from_account").unwrap().clone();
-            let to_vertex = properties.get("to_account").unwrap().clone();
-
+            let from_vertex = properties.get("from_account").unwrap().clone().replace("\"", "");
+            let to_vertex = properties.get("to_account").unwrap().clone().replace("\"", "");
             let insert_edge_query = InsertEdgeQueryWithRank::new(
                 space_name,
                 "tx".to_string(),
                 properties,
                 from_vertex,
                 to_vertex,
-                get_random_int(1, 2147483647)
+                get_random_int(1 as i64, 999999999999999999 as i64)
             );
             insert_edge_queries.push(insert_edge_query);
         }
 
+        // run nebula execution
         tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
         .unwrap()
         .block_on(async {
             let session = pool_nebula.get_session(true).await.unwrap();
+            session.insert_tags(insert_tag_queries).await;
             session.insert_edges(insert_edge_queries).await;
         });
-
-        */
-
-        /* 
-        // insert entity into nebula
-        let mut insert_query: Vec<String> = Vec::new();
-        // insert_query.push(String::from("use TokenTransfer;"));
-
-        for item in entities{
-
-            let mut keys = String::from("(");
-            let mut values = String::from("(");
-            
-
-            for (k, v) in item.entity.0{
-                if k==String::from("id"){
-                    continue;
-                }
-                if keys.len()!= 1 {
-                    keys += ",";
-                }
-                keys += k.as_str();
-                if values.len()!= 1 {
-                    values += ",";
-                }
-                values += v.to_string().as_str();
-            }
-
-            keys += ")";
-            values += ")";
-
-            // println!("key: {}", keys);
-            // println!("value: {}", values);
-            // println!("===============");
-
-            fn get_random_string(len: usize) -> String{
-                let mut rng = rand::thread_rng();
-                let mut test: Vec<u8> = vec![0; len];
-                for i in &mut test{
-                    let dig_or_char: u8 = rng.gen_range(0..=1);
-                    match dig_or_char{
-                        0 => *i = rng.gen_range(48..=57),
-                        _ => *i = rng.gen_range(97..=122),
-                    }
-                }
-                String::from_utf8(test).unwrap()
-            }
-
-            if keys.contains("value"){
-            }else{
-                continue;
-            }
-
-            // INSERT VERTEX transfer (value, to_account, from_account) VALUES "11":("n1", 12);
-            // INSERT VERTEX transfer 
-            let mut query = String::from("use TokenTransfer;INSERT VERTEX transfer ");
-
-            // INSERT VERTEX transfer (value, to_account, from_account)
-            let keys = keys.replace("id", "from_account");
-            let keys = keys.replace("to", "to_account");
-            query += keys.as_str();
-            // INSERT VERTEX transfer (value, to_account, from_account) VALUES "
-            query += " VALUES \"";
-            // INSERT VERTEX transfer (value, to_account, from_account) VALUES "11
-            query += get_random_string(10).as_str();
-            //INSERT VERTEX transfer (value, to_account, from_account) VALUES "11":
-            query += "\":";
-            // INSERT VERTEX transfer (value, to_account, from_account) VALUES "11":("n1", 12)
-            query += values.as_str();
-            query += ";";
-            insert_query.push(query);
-
-        }
-
-        tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build()
-            .unwrap()
-            .block_on(async {
-                // println!("===========test=================");                
-                // pool_nebula.create_new_connection().await;
-
-                let session = pool_nebula.get_session(true).await.unwrap();
-        
-                for query in insert_query{
-                    println!("{}", query);
-                    let _resp = session.execute(query.as_str()).await.unwrap();
-                }
-            });
-
-            */
 
         Ok(event)
     }

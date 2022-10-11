@@ -149,7 +149,7 @@ pub struct InsertEdgeQueryWithRank{
     pub kv: HashMap<String, String>, 
     pub from_vertex: String, 
     pub to_vertex: String,
-    pub rank: i32,
+    pub rank: i64,
 }
 impl InsertEdgeQueryWithRank{
     pub fn new(
@@ -158,7 +158,7 @@ impl InsertEdgeQueryWithRank{
         kv: HashMap<String, String>, 
         from_vertex: String, 
         to_vertex: String,
-        rank: i32,
+        rank: i64,
     ) -> Self{
         InsertEdgeQueryWithRank{
             space_name,
