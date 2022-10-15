@@ -247,22 +247,23 @@ impl EntityCache {
         let missing = missing.filter(|key| !self.schema.is_immutable(&key.entity_type));
 
         let mut missing_by_type: BTreeMap<&EntityType, Vec<&str>> = BTreeMap::new();
+
         for key in missing {
             missing_by_type
                 .entry(&key.entity_type)
                 .or_default()
                 .push(&key.entity_id);
         }
-
-        for (entity_type, entities) in self.store.get_many(missing_by_type)? {
-            for entity in entities {
-                let key = EntityKey {
-                    entity_type: entity_type.clone(),
-                    entity_id: entity.id().unwrap().into(),
-                };
-                self.current.insert(key, Some(entity));
-            }
-        }
+ 
+        // for (entity_type, entities) in self.store.get_many(missing_by_type)? {
+        //     for entity in entities {
+        //         let key = EntityKey {
+        //             entity_type: entity_type.clone(),
+        //             entity_id: entity.id().unwrap().into(),
+        //         };
+        //         self.current.insert(key, Some(entity));
+        //     }
+        // }
 
         let mut mods = Vec::new();
         for (key, update) in self.updates {
@@ -287,7 +288,7 @@ impl EntityCache {
                         Some(Overwrite { key, data })
                     } else {
                         None
-                    }
+                    }                 
                 }
                 // Entity was removed and then updated, so it will be overwritten
                 (Some(current), EntityOp::Overwrite(data)) => {

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+/// contains all properties of both tag and edge
 pub struct Tag{
     property_name: String,
     data_type: DataType,
@@ -48,6 +49,7 @@ impl Tag {
     }
 }
 
+/// frequently-used data type in NebulaGraph
 pub enum DataType {
     Int,
     Bool,
@@ -80,6 +82,7 @@ impl DataType {
     }
 }
 
+/// tag or edge
 pub enum ColType {
     Tag,
     Edge,
@@ -94,6 +97,7 @@ impl ColType {
     }
 }
 
+/// query of inserting tag
 pub struct InsertTagQuery{
     pub space_name: String, 
     pub tag_name: String, 
@@ -143,6 +147,8 @@ impl InsertTagQuery{
     }
 }
 
+
+/// query of inserting edge with rank
 pub struct InsertEdgeQueryWithRank{
     pub space_name: String, 
     pub edge_name: String, 
@@ -201,3 +207,4 @@ impl InsertEdgeQueryWithRank{
         query
     }
 }
+

@@ -113,6 +113,15 @@ pub mod types {
     }
 
     impl Value {
+        pub fn parse_sVal(&self) -> String{
+            let value = self.clone();
+            match value {
+                Value::sVal(s) => {
+                    String::from_utf8(s).clone().unwrap()
+                }
+                _ => String::from("")
+            }
+        }
         pub fn parse_simple_type(&self){
             let value = self.clone();
             match value {

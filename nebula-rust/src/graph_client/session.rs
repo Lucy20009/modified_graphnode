@@ -68,13 +68,6 @@ impl<'a> Session<'a> {
         self.conn.execute(self.session_id, query).await
     }
 
-    #[inline]
-    pub async fn use_space(&self, space_name: &str){
-        let mut query  = String::from("use ");
-        query = query + space_name;
-        let _resp = self.execute(query.as_str()).await.unwrap();
-    }
-
     /// Get the time zone name
     #[inline]
     pub fn time_zone_name(&self) -> &str {
@@ -165,6 +158,11 @@ impl<'a> Session<'a> {
     #[inline]
     // INSERT VERTEX t2 (name, age) VALUES "11":("n1", 12);
     pub async fn insert_tag(&self, space_name: &str, tag_name: &str, kv: HashMap<String, String>, vid: &str){
+
+        if self.find_tag_or_edge(space_name, tag_name, ColType::Tag).await == false{
+            std::thread::sleep(std::time::Duration::from_millis(5000));
+        }
+
         let mut query = String::from("use ");
         query += space_name;
         query += "; ";
@@ -212,6 +210,11 @@ impl<'a> Session<'a> {
     #[inline]
     // INSERT EDGE e2 (name, age) VALUES "11"->"13":("n1", 12);
     pub async fn insert_edge(&self, space_name: &str, edge_name: &str, kv: HashMap<String, String>, from_vertex: &str, to_vertex: &str){
+
+        if self.find_tag_or_edge(space_name, edge_name, ColType::Edge).await == false{
+            std::thread::sleep(std::time::Duration::from_millis(5000));
+        }
+
         let mut query = String::from("use ");
         query += space_name;
         query += "; ";
@@ -325,6 +328,38 @@ impl<'a> Session<'a> {
         let _resp = self.execute(query.as_str()).await.unwrap();
         println!("{:?}", _resp);
     }
+
+    #[inline]
+    pub async fn find_tag_or_edge(&self, space_name: &str, tag_or_edge_name: &str, col_type: ColType) -> bool{
+        let mut query = Self::use_space(space_name);
+        match col_type {
+            ColType::Edge => query += "show edges;",
+            ColType::Tag => query += "show tags;",
+        }
+        let resp = self.execute(query.as_str()).await.unwrap();
+        // print!("{:?}", resp);
+        let res = resp.get_sVal();
+        match res {
+            Some(tags) => {
+                for tag in tags{
+                    if tag == tag_or_edge_name.to_string(){
+                        return true;
+                    }
+                }
+            }
+            None => return false
+        }
+        return false;
+    }
+
+    #[inline]
+    pub fn use_space(space_name: &str) -> String{
+        let mut line = String::from("use ");
+        line += space_name;
+        line += ";";
+        line
+    }
+
 }
 
 impl<'a> Drop for Session<'a> {

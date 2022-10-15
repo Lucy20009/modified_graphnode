@@ -71,6 +71,32 @@ pub mod types {
     }
 
     impl ExecutionResponse{
+        pub fn get_sVal(&self) -> Option<Vec<String>>{
+
+            let mut res: Vec<String> = Vec::new();
+
+            if let common::types::ErrorCode(0i32) = self.error_code{
+            }else{
+                println!("{}", self.error_code.to_string());
+                return None;
+            }
+            // if the result is None
+            if let None = self.data{
+                return None;
+            }
+            // if the execution is successful
+            for row in self.data.to_owned().unwrap().rows{
+                let values = row.values;
+                for value in values{
+                    let value = value.parse_sVal();
+                    if value != String::from(""){
+                        res.push(value);
+                    }
+                }
+            }
+            return Some(res);
+        }
+
         pub fn show_data(&self){
             if let common::types::ErrorCode(0i32) = self.error_code{
             }else{
@@ -85,48 +111,6 @@ pub mod types {
                 for value in values{
                     value.parse_simple_type();
                     println!("====================")
-/*
-                    match value {
-                        common::types::Value::sVal(s) => {
-                            let res = String::from_utf8(s).unwrap();
-                            println!("{}", res);
-                        }
-                        common::types::Value::iVal(i) => {
-                            println!("{}", i);
-                        }
-                        // std::boxed::Box<crate::types::Vertex>
-                        common::types::Value::vVal(v) =>{
-                            let vertex = *v;
-                            // pub vid: crate::types::Value::sVal(::std::vec::Vec<::std::primitive::u8>),
-                            // pub tags: ::std::vec::Vec<crate::types::Tag>,
-                            // println!("{:?}", vertex);
-                            // vid
-                            let _vid = vertex.vid;
-                            if let common::types::Value::sVal(s) = _vid{
-                                let res = String::from_utf8(s).unwrap();
-                                println!("{}", res);
-                            }
-                            // tags
-                            let _tags = vertex.tags;
-                            for tag in _tags{
-                                // name
-                                let name = String::from_utf8(tag.name).unwrap();
-                                println!("{}", name);
-                                // props
-                                let props = tag.props;
-                                for prop in props{
-                                    let k = String::from_utf8(prop.0).unwrap();
-                                    print!("{:?}: ", k);
-                                    let v = prop.1;
-                                    v.parse_simple_type();
-                                }
-
-                            }
-                            println!("=============");
-                        }
-                        _ => println!("{:?}", value)
-                    }
-                    */
                 }
             }
         }

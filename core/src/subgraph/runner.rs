@@ -188,10 +188,14 @@ where
             .await
         {
             // Triggers processed with no errors or with only deterministic errors.
-            Ok(block_state) => block_state,
+            Ok(block_state) => {
+                block_state
+            }
 
             // Some form of unknown or non-deterministic error ocurred.
-            Err(MappingError::Unknown(e)) => return Err(BlockProcessingError::Unknown(e)),
+            Err(MappingError::Unknown(e)) => {   
+                return Err(BlockProcessingError::Unknown(e))
+            }
             Err(MappingError::PossibleReorg(e)) => {
                 info!(logger,
                     "Possible reorg detected, retrying";
@@ -288,6 +292,7 @@ where
         }
 
         let has_errors = block_state.has_errors();
+
         let is_non_fatal_errors_active = self
             .inputs
             .features
@@ -315,6 +320,7 @@ where
             .host
             .stopwatch
             .start_section("as_modifications");
+
         let ModificationsAndCache {
             modifications: mut mods,
             data_sources,

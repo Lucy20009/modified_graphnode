@@ -195,6 +195,7 @@ impl DeploymentStore {
 
         let mut tables: Vec<Arc<Table>> = Vec::new();
 
+
         let res:Result<(), StoreError> = conn.transaction(|| -> Result<_, StoreError> {
             let exists = deployment::exists(&conn, &site)?;
 
