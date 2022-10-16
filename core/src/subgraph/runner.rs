@@ -444,6 +444,10 @@ where
             std::mem::take(&mut self.state.entity_lfu_cache),
         );
 
+
+        let start_time = Instant::now();
+
+
         for trigger in triggers {
             block_state = self
                 .ctx
@@ -466,6 +470,12 @@ where
                     e.context("failed to process trigger".to_string())
                 })?;
         }
+
+
+        println!("process_triggers:{}",start_time.elapsed().as_secs_f64());
+
+
+
         Ok(block_state)
     }
 

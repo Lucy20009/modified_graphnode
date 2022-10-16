@@ -1026,6 +1026,11 @@ impl DeploymentStore {
         manifest_idx_and_name: &[(u32, String)],
         offchain_to_remove: &[StoredDynamicDataSource],
     ) -> Result<StoreEvent, StoreError> {
+
+
+        let start_time = Instant::now();
+
+
         let conn = {
             let _section = stopwatch.start_section("transact_blocks_get_conn");
             self.get_conn()?
@@ -1074,6 +1079,9 @@ impl DeploymentStore {
         // insert edge
         let insert_edge_queries = EntityWithSpaceName::entity_to_insert_edge_queries(&entities);
 
+
+        let start_time2 = Instant::now();
+
         // run nebula execution
         tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -1084,6 +1092,13 @@ impl DeploymentStore {
             session.insert_tags(insert_tag_queries).await;
             session.insert_edges(insert_edge_queries).await;
         });
+
+
+        println!("insert_into_nebula:{}", start_time2.elapsed().as_secs_f64());
+
+
+        println!("transact_block_operations:{}", start_time.elapsed().as_secs_f64());
+
 
         Ok(event)
     }

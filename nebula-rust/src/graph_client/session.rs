@@ -116,7 +116,7 @@ impl<'a> Session<'a> {
         let query = self.get_create_space_query(space_name, partition_num, replica_factor, is_fixed_string, fixed_string_len, comment);
         // println!("{}", query);
         let _resp = self.execute(query.as_str()).await.unwrap();
-        //println!("{:?}", _resp);
+        // println!("{:?}", _resp);
     }
 
     #[inline]
@@ -188,9 +188,9 @@ impl<'a> Session<'a> {
         query += values.as_str();
         query += ";";
 
-        println!("{}", query);
+        // println!("{}", query);
         let _resp = self.execute(query.as_str()).await.unwrap();
-        println!("{:?}", _resp);
+        // println!("{:?}", _resp);
     }
 
     #[inline]
@@ -242,7 +242,7 @@ impl<'a> Session<'a> {
         query += values.as_str();
         query += ";";
 
-        println!("{}", query);
+        // println!("{}", query);
         let _resp = self.execute(query.as_str()).await.unwrap();
     }
 
@@ -279,9 +279,9 @@ impl<'a> Session<'a> {
         query += values.as_str();
         query += ";";
 
-        println!("{}", query);
+        // println!("{}", query);
         let _resp = self.execute(query.as_str()).await.unwrap();
-        println!("{:?}", _resp);
+        // println!("{:?}", _resp);
     }
 
     #[inline]
@@ -324,9 +324,9 @@ impl<'a> Session<'a> {
         }
         query += ";";
 
-        println!("{}", query);
+        // println!("{}", query);
         let _resp = self.execute(query.as_str()).await.unwrap();
-        println!("{:?}", _resp);
+        // println!("{:?}", _resp);
     }
 
     #[inline]
