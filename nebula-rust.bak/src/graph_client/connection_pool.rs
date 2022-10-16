@@ -30,7 +30,7 @@ impl ConnectionPool {
     /// Construct pool by the configuration
     pub async fn new(conf: &PoolConfig) -> Self {
 
-        println!("conf: {:?}", conf.clone());
+        // println!("conf: {:?}", conf.clone());
 
         let conns = std::collections::LinkedList::<Connection>::new();
         let pool = ConnectionPool {
