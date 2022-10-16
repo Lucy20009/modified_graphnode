@@ -404,11 +404,11 @@ impl Layout {
         let catalog = Catalog::for_creation(site.cheap_clone());
         let layout = Self::new(site, schema, catalog)?;
 
-        // let sql = layout
-        //     .as_ddl()
-        //     .map_err(|_| StoreError::Unknown(anyhow!("failed to generate DDL for layout")))?;
+        let sql = layout
+            .as_ddl()
+            .map_err(|_| StoreError::Unknown(anyhow!("failed to generate DDL for layout")))?;
 
-        // conn.batch_execute(&sql)?;
+        conn.batch_execute(&sql)?;
         Ok(layout)
     }
 
