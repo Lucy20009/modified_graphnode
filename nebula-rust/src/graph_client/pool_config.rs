@@ -78,7 +78,7 @@ impl PoolConfig {
     #[inline]
     pub fn address(&mut self, address: String) -> &mut Self {
         self.addresses.push(address);
-        println!("{:?}", self.addresses.clone());
+        // println!("{:?}", self.addresses.clone());
         self
     }
     #[inline]

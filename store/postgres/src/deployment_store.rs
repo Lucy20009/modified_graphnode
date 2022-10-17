@@ -1019,8 +1019,88 @@ impl DeploymentStore {
             .map(|(entities, _)| entities)
     }
 
-    
+    fn apply_entity_modifications(
+        &self,
+        conn: &PgConnection,
+        layout: &Layout,
+        mods: &[EntityModification],
+        ptr: &BlockPtr,
+        stopwatch: &StopwatchMetrics,
+        entities: & mut Vec<EntityWithSpaceName>
+    ) -> Result<i32, StoreError> {
+        use EntityModification::*;
+        let mut count = 0;
 
+        // Group `Insert`s and `Overwrite`s by key, and accumulate `Remove`s.
+        for modification in mods.into_iter() {
+            match modification {
+                Insert { key, data } => {
+                    entities.push(EntityWithSpaceName::new(key.entity_type.to_string(), data.clone()));
+                }
+                Overwrite { key, data } => {
+                    entities.push(EntityWithSpaceName::new(key.entity_type.to_string(), data.clone()));
+                }
+                Remove { key } => {
+                    continue;
+                }
+            }
+        }
+        Ok(entities.len() as i32)
+    }
+
+    fn insert_entities<'a>(
+        &'a self,
+        entity_type: &'a EntityType,
+        data: &'a mut [(&'a EntityKey, Cow<'a, Entity>)],
+        conn: &PgConnection,
+        layout: &'a Layout,
+        ptr: &BlockPtr,
+        stopwatch: &StopwatchMetrics,
+    ) -> Result<usize, StoreError> {
+        let section = stopwatch.start_section("check_interface_entity_uniqueness");
+        for (key, _) in data.iter() {
+            // WARNING: This will potentially execute 2 queries for each entity key.
+            self.check_interface_entity_uniqueness(conn, layout, key)?;
+        }
+        section.end();
+
+        let _section = stopwatch.start_section("apply_entity_modifications_insert");
+        layout.insert(conn, entity_type, data, block_number(ptr), stopwatch)
+    }
+    fn overwrite_entities<'a>(
+        &'a self,
+        entity_type: &'a EntityType,
+        data: &'a mut [(&'a EntityKey, Cow<'a, Entity>)],
+        conn: &PgConnection,
+        layout: &'a Layout,
+        ptr: &BlockPtr,
+        stopwatch: &StopwatchMetrics,
+    ) -> Result<usize, StoreError> {
+        let section = stopwatch.start_section("check_interface_entity_uniqueness");
+        for (key, _) in data.iter() {
+            // WARNING: This will potentially execute 2 queries for each entity key.
+            self.check_interface_entity_uniqueness(conn, layout, key)?;
+        }
+        section.end();
+
+        let _section = stopwatch.start_section("apply_entity_modifications_update");
+        layout.update(conn, entity_type, data, block_number(ptr), stopwatch)
+    }
+
+    fn remove_entities(
+        &self,
+        entity_type: &EntityType,
+        entity_keys: &[&str],
+        conn: &PgConnection,
+        layout: &Layout,
+        ptr: &BlockPtr,
+        stopwatch: &StopwatchMetrics,
+    ) -> Result<usize, StoreError> {
+        let _section = stopwatch.start_section("apply_entity_modifications_delete");
+        layout
+            .delete(conn, entity_type, entity_keys, block_number(ptr), stopwatch)
+            .map_err(|_error| anyhow!("Failed to remove entities: {:?}", entity_keys).into())
+    }
     pub(crate) fn transact_block_operations(
         &self,
         site: Arc<Site>,
@@ -1062,21 +1142,39 @@ impl DeploymentStore {
 
             let section = stopwatch.start_section("apply_entity_modifications");
             
-            use EntityModification::*;
-            for modification in mods.into_iter() {
-                match modification {
-                    Insert { key, data } => {
-                        entities.push(EntityWithSpaceName::new(key.entity_type.to_string(), data.clone()));
-                    }
-                    Overwrite { key, data } => {
-                        entities.push(EntityWithSpaceName::new(key.entity_type.to_string(), data.clone()));
-                    }
-                    Remove { key } => {
-                        continue;
-                    }
-                }
-            }
+            let count = self.apply_entity_modifications(
+                &conn,
+                layout.as_ref(),
+                mods,
+                block_ptr_to,
+                stopwatch,
+                & mut entities,
+            )?;
             section.end();
+            dynds::insert(
+                &conn,
+                &site,
+                data_sources,
+                block_ptr_to,
+                manifest_idx_and_name,
+            )?;
+            dynds::remove_offchain(&conn, &site, offchain_to_remove)?;
+            if !deterministic_errors.is_empty() {
+                deployment::insert_subgraph_errors(
+                    &conn,
+                    &site.deployment,
+                    deterministic_errors,
+                    block_ptr_to.block_number(),
+                )?;
+            }
+            deployment::transact_block(
+                &conn,
+                &site,
+                block_ptr_to,
+                firehose_cursor,
+                layout.count_query.as_str(),
+                count,
+            )?;
             Ok(event)
         })?;
 
