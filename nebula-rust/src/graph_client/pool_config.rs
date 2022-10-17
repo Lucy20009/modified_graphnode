@@ -28,6 +28,24 @@ impl PoolConfig {
     }
 
     #[inline]
+    pub fn new_conf(nebula_url: &str) -> Self{
+        let v:Vec<&str> = nebula_url.split('@').collect();
+        let v2:Vec<&str> = v[1].split('/').collect();
+        let add = String::from(v2[0]);
+        let v3:Vec<&str> = v[0].split(':').collect();
+        let username = String::from(v3[0]);
+        let password = String::from(v3[1]);
+
+        let mut conf = PoolConfig::new();
+        conf.min_connection_pool_size(2)
+            .max_connection_pool_size(10)
+            .address(add)
+            .set_username(username)
+            .set_password(password);
+        conf
+    }
+
+    #[inline]
     pub fn timeout(&mut self, timeout: u32) -> &mut Self {
         self.timeout = timeout;
         self

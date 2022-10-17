@@ -38,7 +38,7 @@ use graph::prelude::{
 };
 use graph_graphql::prelude::api_schema;
 use web3::types::Address;
-use nebula_rust::graph_client::{pool_config, connection_pool, session, nebula_schema::{ColType, Tag, DataType, InsertTagQuery, InsertEdgeQueryWithRank}};
+use nebula_rust::graph_client::{pool_config, connection_pool, connection::Connection as Connection_nebula,session, nebula_schema::{ColType, Tag, DataType, InsertTagQuery, InsertEdgeQueryWithRank}};
 use rand::Rng;
 
 use crate::block_range::block_number;
@@ -104,7 +104,7 @@ pub struct StoreInner {
     pub(crate) layout_cache: LayoutCache,
 
     // pool_nebula: connection_test::ConnectionPool,
-    pool_nebula: connection_pool::ConnectionPool_nebula,
+    conf_nebula: pool_config::PoolConfig,
 
 
 }
@@ -158,8 +158,10 @@ impl DeploymentStore {
 
 
 
-        // init nebula connection pool
-        let pool_nebula = connection_pool::ConnectionPool_nebula::new_pool(nebula_url.as_str());
+        // init nebula connection configuration
+        // let pool_nebula = connection_pool::ConnectionPool_nebula::new_pool(nebula_url.as_str());
+        let conf_nebula = pool_config::PoolConfig::new_conf(nebula_url.as_str());
+
 
         // Create the store
         let store = StoreInner {
@@ -170,7 +172,7 @@ impl DeploymentStore {
             conn_round_robin_counter: AtomicUsize::new(0),
             subgraph_cache: Mutex::new(LruCache::with_capacity(100)),
             layout_cache: LayoutCache::new(ENV_VARS.store.query_stats_refresh_interval),
-            pool_nebula,
+            conf_nebula,
         };
 
         DeploymentStore(Arc::new(store))
@@ -187,10 +189,14 @@ impl DeploymentStore {
 
         let conn = self.get_conn()?;
 
+        let conf_nebula = &self.conf_nebula;
         // get nebula session
-        let pool_nebula = &self.pool_nebula;
-        pool_nebula.create_new_connection().await;
-        let session = pool_nebula.get_session(true).await.unwrap();
+        let conn_nebula = Connection_nebula::new_from_conf(conf_nebula).await.unwrap();
+
+        let resp = conn_nebula.authenticate(conf_nebula.username.clone().as_str(), conf_nebula.password.clone().as_str()).await.unwrap();
+
+        let session_id = resp.session_id.unwrap();
+
         // CREATE SPACE `token_transfer` (partition_num = 1, replica_factor = 1, vid_type = FIXED_STRING(50))
 
         let mut tables: Vec<Arc<Table>> = Vec::new();
@@ -246,7 +252,7 @@ impl DeploymentStore {
 
             let mut all_queries = String::from("");
 
-            all_queries += session.get_create_space_query(table.object.as_str(), 1, 1, true, 50, "").as_str();
+            all_queries += conn_nebula.get_create_space_query(table.object.as_str(), 1, 1, true, 50, "").as_str();
 
             // create tag
             // only create one property (id)
@@ -270,7 +276,7 @@ impl DeploymentStore {
                 tags.push(tag);
             }
 
-            all_queries += session.get_create_tag_or_edge(space_name, col_type, tag_name, comment, tags).as_str();
+            all_queries += conn_nebula.get_create_tag_or_edge(space_name, col_type, tag_name, comment, tags).as_str();
 
             // create edge (custom)
             if table.object.as_str() == "TokenTransfer"{
@@ -282,11 +288,12 @@ impl DeploymentStore {
                 tags.push(Tag::new("from_account", DataType::String, false, "", ""));
                 tags.push(Tag::new("to_account", DataType::String, false, "", ""));
                 tags.push(Tag::new("value", DataType::Int32, false, "", ""));
-                all_queries += session.get_create_tag_or_edge(space_name, col_type, tag_name, comment, tags).as_str();
+                all_queries += conn_nebula.get_create_tag_or_edge(space_name, col_type, tag_name, comment, tags).as_str();
             }
 
 
-            let _resp = session.execute(all_queries.as_str()).await.unwrap();
+            let _resp = conn_nebula.execute(session_id, all_queries.as_str(), ).await.unwrap();
+            conn_nebula.signout(session_id).await;
             std::thread::sleep(std::time::Duration::from_millis(5000));
         }
         let res = Ok(());
@@ -1036,7 +1043,7 @@ impl DeploymentStore {
             self.get_conn()?
         };
 
-        let pool_nebula = &self.pool_nebula;
+        let conf_nebula = &self.conf_nebula;
 
         let mut entities: Vec<EntityWithSpaceName> = Vec::new();
 
@@ -1088,9 +1095,13 @@ impl DeploymentStore {
         .build()
         .unwrap()
         .block_on(async {
-            let session = pool_nebula.get_session(true).await.unwrap();
-            session.insert_tags(insert_tag_queries).await;
-            session.insert_edges(insert_edge_queries).await;
+            // get nebula session
+            let conn_nebula = Connection_nebula::new_from_conf(conf_nebula).await.unwrap();
+            let resp = conn_nebula.authenticate(conf_nebula.username.clone().as_str(), conf_nebula.password.clone().as_str()).await.unwrap();
+            let session_id = resp.session_id.unwrap();
+            conn_nebula.insert_tags(insert_tag_queries, session_id).await;
+            conn_nebula.insert_edges(insert_edge_queries, session_id).await;
+            conn_nebula.signout(session_id).await;
         });
 
 
