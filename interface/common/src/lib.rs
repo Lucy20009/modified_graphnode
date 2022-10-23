@@ -96,7 +96,7 @@ pub mod types {
     pub enum Value {
         nVal(crate::types::NullType),
         bVal(::std::primitive::bool),
-        iVal(::std::primitive::i64),
+        iVal(::std::primitive::i32),
         fVal(crate::double::Double),
         sVal(::std::vec::Vec<::std::primitive::u8>),
         dVal(crate::types::Date),
@@ -122,8 +122,9 @@ pub mod types {
                 _ => String::from("")
             }
         }
-        pub fn parse_simple_type(&self){
+        pub fn parse_simple_type(&self) -> i32 {
             let value = self.clone();
+            let r = 0;
             match value {
                 Value::nVal(_nullType) => {
                     println!("NullType")
@@ -132,13 +133,16 @@ pub mod types {
                     println!("{}", b);
                 }
                 Value::iVal(i) => {
-                    println!("{}", i);
+                    println!("ivalue:{}", i);
+                    return i;
                 }
                 Value::fVal(f) => {
                     println!("{}", f.0);
                 }
                 Value::sVal(s) => {
-                    println!("{:?}", String::from_utf8(s).clone().unwrap());
+                    let s1 = String::from_utf8(s).clone().unwrap();
+                    println!("{:?}", s1);
+                    // return s1;
                 }
                 Value::dVal(d) => {
                     println!("{}", d);
@@ -197,7 +201,7 @@ pub mod types {
                     for kv in kvs{
                         let k = String::from_utf8(kv.0).unwrap();
                         print!("{}: ", k);
-                        kv.1.parse_simple_type();
+                        return kv.1.parse_simple_type();
                     }
                 }
                 Value::uVal(u) => {
@@ -222,6 +226,7 @@ pub mod types {
                     println!("UnknowFiled: {}", unknownFiled);
                 }
             }
+            return r;
         }    
     }
 

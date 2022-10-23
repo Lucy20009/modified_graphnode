@@ -18,7 +18,7 @@ use crate::graph_client::nebula_schema::Tag;
 use crate::graph_client::nebula_schema::ColType;
 use crate::graph_client::nebula_schema::InsertTagQuery;
 use crate::graph_client::nebula_schema::InsertEdgeQueryWithRank;
-
+pub use common::types::{Value};
 /// The simple abstraction of a connection to nebula graph server
 #[derive(Default)]
 pub struct Connection {
@@ -233,9 +233,10 @@ impl Connection {
         query += values.as_str();
         query += ";";
 
-        // println!("{}", query);
+        println!("---------------insert tag----------------");
+        println!("{}", query);
         let _resp = self.execute(session_id, query.as_str()).await.unwrap();
-        // println!("{:?}", _resp);
+        println!("{:?}", _resp);
     }
 
     #[inline]
@@ -287,14 +288,13 @@ impl Connection {
         query += values.as_str();
         query += ";";
 
-        // println!("{}", query);
         let _resp = self.execute(session_id, query.as_str()).await.unwrap();
     }
 
 
     #[inline]
     // INSERT EDGE e2 (name, age) VALUES "11"->"13"@1:("n1", 12);
-    pub async fn insert_edge_with_rank(&self, space_name: &str, edge_name: &str, kv: HashMap<String, String>, from_vertex: &str, to_vertex: &str, rank: i64, session_id: i64){
+    pub async fn insert_edge_with_rank(&self, space_name: &str, edge_name: &str, kv: HashMap<String, String>, from_vertex: &str, to_vertex: &str, rank: i32, session_id: i64){
         let mut query = String::from("use ");
         query += space_name;
         query += "; ";
@@ -303,13 +303,44 @@ impl Connection {
         query += " ";
         let mut keys = String::from("(");
         let mut values = String::from("(");
+        let mut count = 0;
         for (k,v) in kv{
-            if keys.len()!=1{
-                keys += ",";
-                values += ",";
+            if k =="operation" || k == "id" {
+                continue;
             }
-            keys += k.as_str();
-            values += v.as_str();
+            if k == "from_account" {
+                if count >= 1{
+                    keys += ",";
+                    values += ",";
+                }
+                keys += "to_account";
+                values += v.as_str();
+                count += 1;
+            }else if k == "to_account" {
+                if count >= 1{
+                    keys += ",";
+                    values += ",";
+                }
+                keys += "from_account";
+                values += v.as_str();
+                count += 1;
+            }else if k == "value" {
+                if count >= 1{
+                    keys += ",";
+                    values += ",";
+                }
+                keys += "transactions";
+                values += "\"\"";
+                count += 1;
+            }else {
+                if count >= 1{
+                    keys += ",";
+                    values += ",";
+                }
+                keys += k.as_str();
+                values += v.as_str();
+                count += 1;
+            }
         }
         keys += ")";
         values += ")";
@@ -324,9 +355,9 @@ impl Connection {
         query += values.as_str();
         query += ";";
 
-        // println!("{}", query);
+        // println!("insert edge query:{}", query);
         let _resp = self.execute(session_id, query.as_str()).await.unwrap();
-        // println!("{:?}", _resp);
+        // println!("insert edge resp{:?}", _resp);
     }
 
     #[inline]
@@ -396,6 +427,217 @@ impl Connection {
         }
         return false;
     }
+
+    #[inline]
+    pub async fn find_value_by_id(&self, space_name: &str, tag_name: &str, vid:&str, session_id: i64) -> i32{
+        //FETCH PROP ON TokenTransfer_tag "0x256a0b3cb2174d042e4445563ca4977f837a7803" YIELD TokenTransfer_tag.value; 
+        let mut query = String::from("use ");
+        query += space_name;
+        query += ";";
+        query += "FETCH PROP ON ";
+        query += tag_name;
+        query += " \"";
+        query += vid;
+        query += "\" ";
+        query += "YIELD ";
+        query += tag_name;
+        query += ".value";
+       
+        let resp = self.execute(session_id, query.as_str()).await.unwrap();
+       
+        if let None = resp.data{
+            return 0;
+        }
+       
+        resp.show_data();
+        let rows = resp.data.to_owned().unwrap().rows;
+        
+        for row in rows{
+            let values = row.values;
+            for value in values{
+                let my_int = value.parse_simple_type();
+                return my_int;
+            }
+        }
+        return 0;
+    }
+
+    #[inline]
+    pub async fn upsert_tags_add(&self, insert_tag_queries: Vec<InsertTagQuery>, session_id: i64){
+        for query in insert_tag_queries {
+            self.upsert_tag_add(query.space_name.as_str(), query.tag_name.as_str(), query.kv, query.vid.as_str(), session_id).await;
+        }
+    }
+
+    #[inline]
+    pub async fn upsert_tag_add(&self, space_name: &str, tag_name: &str,  kv: HashMap<String, String>, vid: &str, session_id: i64) {
+        // UPSERT VERTEX "0x256a0b3cb2174d042e4445563ca4977f837a7803" SET TokenTransfer_tag.id = "0x256a0b3cb2174d042e4445563ca4977f837a7803", TokenTransfer_tag.value = "10" 
+        // WHEN $^.TokenTransfer_tag.id == "0x256a0b3cb2174d042e4445563ca4977f837a7803" YIELD $^.TokenTransfer_tag.id AS id, $^.TokenTransfer_tag.value AS value;
+        for (k,v) in kv{
+            let mut re = 0;
+            if k == "value" {
+                re = self.find_value_by_id(space_name, tag_name, vid, session_id).await;
+                re += v.parse::<i32>().unwrap();
+            }
+            let re = re.to_string();
+            let mut query = String::from("use ");
+            query += space_name;
+            query += "; ";
+            query += "UPSERT VERTEX \"";
+            query += vid;
+            query += "\" SET ";
+            query += tag_name;
+            query += ".id";
+            query += " = \"";
+            query += vid;
+            query += "\", ";
+            query += tag_name;
+            query += ".value";
+            query += " = ";
+            query += re.as_str();
+            query += " WHEN $^.";
+            query += tag_name;
+            query += ".id";
+            query += " == \"";
+            query += vid;
+            query += "\";";
+            let _resp = self.execute(session_id, query.as_str()).await.unwrap();
+        }
+       
+    }
+
+    #[inline]
+    pub async fn upsert_tags_sub(&self, insert_tag_queries: Vec<InsertTagQuery>, session_id: i64){
+        for query in insert_tag_queries {
+            self.upsert_tag_sub(query.space_name.as_str(), query.tag_name.as_str(), query.kv, query.vid.as_str(), session_id).await;
+        }
+    }
+    
+    #[inline]
+    pub async fn upsert_tag_sub(&self, space_name: &str, tag_name: &str,  kv: HashMap<String, String>, vid: &str, session_id: i64) {
+        //  UPSERT VERTEX "player111" SET player.name = "David", player.age = $^.player.age + 11 \
+        // WHEN $^.player.name == "David West" AND $^.player.age > 20 \
+        // YIELD $^.player.name AS Name, $^.player.age AS Age;
+        for (k,v) in kv{
+            let mut re = 0;
+            if k == "value" {
+                re = self.find_value_by_id(space_name, tag_name, vid, session_id).await;
+                re -= v.parse::<i32>().unwrap();
+            }
+            let re = re.to_string();
+            let mut query = String::from("use ");
+            query += space_name;
+            query += "; ";
+            query += "UPSERT VERTEX \"";
+            query += vid;
+            query += "\" SET ";
+            query += tag_name;
+            query += ".id";
+            query += " = \"";
+            query += vid;
+            query += "\", ";
+            query += tag_name;
+            query += ".value";
+            query += " = ";
+            query += re.as_str();
+            query += " WHEN $^.";
+            query += tag_name;
+            query += ".id";
+            query += " == \"";
+            query += vid;
+            query += "\";";
+            let _resp = self.execute(session_id, query.as_str()).await.unwrap();
+        }
+       
+    }
+
+    pub async fn find_trasaction_by_rank(&self, space_name: &str, edge_name: &str, from_vertex: &str, to_vertex: &str, rank: i32, session_id: i64) -> String {
+        // FETCH PROP ON tx "0x256a0b3cb2174d042e4445563ca4977f837a7803" -> "0x893c9b967542ea01e58e1006e96e8b41e308194e"@193 yield tx.transactions;
+        let mut query = String::from("use ");
+        query += space_name;
+        query += "; ";
+        query += "FETCH PROP ON ";
+        query += edge_name;
+        query += " \"";
+        query += from_vertex;
+        query += "\" -> \"";
+        query += to_vertex;
+        query += "\"@";
+        query += rank.to_string().as_str();
+        query += " yield ";
+        query += edge_name;
+        query += ".";
+        query += "transactions";
+        query += ";";
+
+        let resp = self.execute(session_id, query.as_str()).await.unwrap();
+        if let None = resp.data{
+            return String::from("");
+        }
+        let rows = resp.data.to_owned().unwrap().rows;
+    
+        for row in rows{
+            let values = row.values;
+            for value in values{
+                match value {
+                    Value::mVal(m) => {
+                        let kvs = m.kvs;
+                        for kv in kvs{
+                            match kv.1 {
+                                Value::sVal(s) => {
+                                    let s1 = String::from_utf8(s).clone().unwrap();
+                                    return s1;
+                                }
+                                _ => ()
+                            }
+                            
+                        }
+                    }
+                    _ => ()
+                }
+            }
+        }
+        return "".to_string();
+        
+    }
+
+    pub async fn update_trasantion_by_id(&self, space_name: &str, edge_name: &str, kv: HashMap<String, String>, from_vertex: &str, to_vertex: &str, rank: i32, session_id: i64){
+        // UPDATE EDGE "player100" -> "player101" OF follow SET degree = 96;
+        for (k,v) in kv{
+            let mut re = String::from("");
+            if k == "transactions"{
+                re += &*self.find_trasaction_by_rank(space_name, edge_name, from_vertex, to_vertex, rank, session_id).await;
+                if re != ""{
+                    re += ",";
+                }
+                re += &v.to_string();
+            }
+            let re = re.to_string();
+            let mut query = String::from("use ");
+            query += space_name;
+            query += "; ";
+            query += "UPDATE EDGE \"";
+            query += from_vertex;
+            query += "\" -> \"";
+            query += to_vertex;
+            query += "\"@";
+            query += &rank.to_string();
+            query += " OF ";
+            query += edge_name;
+            query += " SET transactions = \"";
+            query += &re;
+            query += "\";";
+
+            let _resp = self.execute(session_id, query.as_str()).await.unwrap();
+        }
+    }
+
+    pub async fn update_trasantions_add(&self, insert_edge_queries: Vec<InsertEdgeQueryWithRank>, session_id: i64){
+        for query in insert_edge_queries {
+            self.update_trasantion_by_id(query.space_name.as_str(), query.edge_name.as_str(), query.kv, query.from_vertex.as_str(), query.to_vertex.as_str(), query.rank, session_id).await;
+        }
+    }
+
 
     #[inline]
     pub fn use_space(space_name: &str) -> String{

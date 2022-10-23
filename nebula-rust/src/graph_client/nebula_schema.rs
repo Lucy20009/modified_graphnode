@@ -56,6 +56,7 @@ pub enum DataType {
     String,
     FixedString,
     Double,
+    Int64,
     Int32,
     Int16,
     Int8,
@@ -72,6 +73,7 @@ impl DataType {
             DataType::String => String::from("string"),
             DataType::FixedString => String::from("fixed_string"),
             DataType::Double => String::from("double"),
+            DataType::Int64 => String::from("int64"),
             DataType::Int32 => String::from("int32"),
             DataType::Int16 => String::from("int16"),
             DataType::Int8 => String::from("int8"),
@@ -155,7 +157,7 @@ pub struct InsertEdgeQueryWithRank{
     pub kv: HashMap<String, String>, 
     pub from_vertex: String, 
     pub to_vertex: String,
-    pub rank: i64,
+    pub rank: i32,
 }
 impl InsertEdgeQueryWithRank{
     pub fn new(
@@ -164,7 +166,7 @@ impl InsertEdgeQueryWithRank{
         kv: HashMap<String, String>, 
         from_vertex: String, 
         to_vertex: String,
-        rank: i64,
+        rank: i32,
     ) -> Self{
         InsertEdgeQueryWithRank{
             space_name,
