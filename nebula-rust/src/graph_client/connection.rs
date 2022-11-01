@@ -312,7 +312,7 @@ impl Connection {
 
     #[inline]
     // INSERT EDGE e2 (name, age) VALUES "11"->"13"@1:("n1", 12);
-    pub async fn insert_edge_with_rank(&self, space_name: &str, edge_name: &str, kv: HashMap<String, String>, from_vertex: &str, to_vertex: &str, rank: i32, value: i32, session_id: i64){
+    pub async fn insert_edge_with_rank(&self, space_name: &str, edge_name: &str, kv: HashMap<String, String>, from_vertex: &str, to_vertex: &str, rank: i32, value: i64, session_id: i64){
 
         let mut query = String::from("use ");
         query += space_name;

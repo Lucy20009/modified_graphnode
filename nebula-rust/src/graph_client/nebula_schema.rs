@@ -164,7 +164,7 @@ pub struct InsertEdgeQueryWithRank{
     pub from_vertex: String, 
     pub to_vertex: String,
     pub rank: i32,
-    pub value: i32,
+    pub value: i64,
 }
 impl InsertEdgeQueryWithRank{
     pub fn new(
@@ -174,7 +174,7 @@ impl InsertEdgeQueryWithRank{
         from_vertex: String, 
         to_vertex: String,
         rank: i32,
-        value: i32,
+        value: i64,
     ) -> Self{
         InsertEdgeQueryWithRank{
             space_name,

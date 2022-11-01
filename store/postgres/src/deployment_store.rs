@@ -1845,7 +1845,7 @@ impl EntityWithSpaceName{
                     from_vertex,
                     to_vertex,
                     entity.block_number,
-                    value.parse::<i32>().unwrap(),
+                    value.parse::<i64>().unwrap(),
                 );
                 insert_edge_queries.push(insert_edge_query);
             }
