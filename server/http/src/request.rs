@@ -6,9 +6,12 @@ use graph::prelude::*;
 
 pub fn parse_graphql_request(body: &Bytes) -> Result<Query, GraphQLServerError> {
     // Parse request body as JSON
+    // let s1 = String::from_utf8(body.to_vec()).clone().unwrap();
+    // println!("request body string: {:?}",s1);
     let json: serde_json::Value = serde_json::from_slice(body)
         .map_err(|e| GraphQLServerError::ClientError(format!("{}", e)))?;
 
+    // println!("request json: {:?}",json);
     // Ensure the JSON data is an object
     let obj = json.as_object().ok_or_else(|| {
         GraphQLServerError::ClientError(String::from("Request data is not an object"))
@@ -25,12 +28,12 @@ pub fn parse_graphql_request(body: &Bytes) -> Result<Query, GraphQLServerError> 
     let query_string = query_value.as_str().ok_or_else(|| {
         GraphQLServerError::ClientError(String::from("The \"query\" field is not a string"))
     })?;
-
+    // println!("query string: {:?}",query_string);
     // Parse the "query" field of the JSON body
     let document = graphql_parser::parse_query(query_string)
         .map_err(|e| GraphQLServerError::from(QueryError::ParseError(Arc::new(e.into()))))?
         .into_static();
-
+    // println!("document: {:?}",document);
     // Parse the "variables" field of the JSON body, if present
     let variables = match obj.get("variables") {
         None | Some(serde_json::Value::Null) => Ok(None),
@@ -41,7 +44,7 @@ pub fn parse_graphql_request(body: &Bytes) -> Result<Query, GraphQLServerError> 
             "Invalid query variables provided".to_string(),
         )),
     }?;
-
+    // println!("variables:{:?}", variables);
     Ok(Query::new(document, variables))
 }
 

@@ -1182,15 +1182,10 @@ impl DeploymentStore {
         })?;
 
         // insert tag
-        // let insert_tag_queries = EntityWithSpaceName::entity_to_insert_tag_query(&entities);
-
-        // upsert tag
-        let upsert_tag_add_queries = EntityWithSpaceName::entity_to_upsert_add_tag_query(&entities);
-        let upsert_tag_sub_queries = EntityWithSpaceName::entity_to_upsert_sub_tag_query(&entities);
-
+        let insert_tag_queries = EntityWithSpaceName::entity_to_insert_tag_query(&entities);
+  
         // insert edge
         let insert_edge_queries = EntityWithSpaceName::entity_to_insert_edge_queries(&entities);
-        let update_edge_add_queries = EntityWithSpaceName::entity_to_insert_add_edge_queries(&entities);
 
 
         let start_time2 = Instant::now();
@@ -1205,14 +1200,10 @@ impl DeploymentStore {
             let conn_nebula = Connection_nebula::new_from_conf(conf_nebula).await.unwrap();
             let resp = conn_nebula.authenticate(conf_nebula.username.clone().as_str(), conf_nebula.password.clone().as_str()).await.unwrap();
             let session_id = resp.session_id.unwrap();
-            // conn_nebula.insert_tags(insert_tag_queries, session_id).await;
-            conn_nebula.upsert_tags_add(upsert_tag_add_queries, session_id).await;
-            conn_nebula.upsert_tags_sub(upsert_tag_sub_queries, session_id).await;
+            conn_nebula.insert_tags(insert_tag_queries, session_id).await;
             conn_nebula.insert_edges(insert_edge_queries, session_id).await;
-            conn_nebula.update_trasantions_add(update_edge_add_queries, session_id).await;
             conn_nebula.signout(session_id).await;
         });
-
 
         println!("insert_into_nebula:{}", start_time2.elapsed().as_secs_f64());
 
@@ -1763,213 +1754,82 @@ impl EntityWithSpaceName{
         String::from_utf8(test).unwrap()
     }
 
-    // pub fn entity_to_insert_tag_query(entities: &Vec<EntityWithSpaceName>) -> Vec<InsertTagQuery>{
-    //     let mut insert_tag_queries: Vec<InsertTagQuery> = Vec::new();
-    //     for entity in entities{
-    //         if entity.space_name == String::from("Poi$"){
-    //             continue;
-    //         }
-    //         let mut properties_from: HashMap<String, String> = HashMap::new();
-    //         let mut properties_to: HashMap<String, String> = HashMap::new();
-    //         for (k,v) in &entity.entity.0{
-    //             // (id) VALUES "from_account"(from_account)
-    //             if k.clone()==String::from("from_account"){
-    //                 properties_from.insert("id".to_string(), v.clone().to_string());
-    //             }
-    //             else if k.clone()==String::from("to_account"){
-    //                 properties_to.insert("id".to_string(), v.clone().to_string());
-    //             }
-    //         }
-    //         let space_name = entity.space_name.clone();
-    //         let tag_name = space_name.clone() + "_tag";
-    //         let vid_from = properties_from.get("id").unwrap().clone().replace("\"", "");
-    //         let vid_to = properties_to.get("id").unwrap().clone().replace("\"", "");
-    //         let insert_tag_query_from = InsertTagQuery::new(space_name.clone(), tag_name.clone(), properties_from, vid_from);
-    //         let insert_tag_query_to = InsertTagQuery::new(space_name, tag_name, properties_to, vid_to);
-    //         insert_tag_queries.push(insert_tag_query_from);
-    //         insert_tag_queries.push(insert_tag_query_to);
-    //     }
-    //     insert_tag_queries
-    // }
-
-    pub fn entity_to_upsert_add_tag_query(entities: &Vec<EntityWithSpaceName>) -> Vec<InsertTagQuery>{
+    pub fn entity_to_insert_tag_query(entities: &Vec<EntityWithSpaceName>) -> Vec<InsertTagQuery>{
         let mut insert_tag_queries: Vec<InsertTagQuery> = Vec::new();
         for entity in entities{
             if entity.space_name == String::from("Poi$"){
                 continue;
             }
-            let mut properties_add: HashMap<String, String> = HashMap::new();
-            let mut properties_add_values: HashMap<String, String> = HashMap::new();
-            if entity.entity.0.get("operation").unwrap().to_string()==String::from("1"){
+            let mut properties_from: HashMap<String, String> = HashMap::new();
+            let mut properties_to: HashMap<String, String> = HashMap::new();
+            let mut value = String::from("");
+            if entity.entity.0.get("operation").clone().unwrap().to_string()==String::from("1"){
                 for (k,v) in &entity.entity.0{
-                    if k.clone()==String::from("to_account"){
-                        properties_add.insert("id".to_string(), v.clone().to_string());
+                    // println!("------------kv-------------");
+                    // println!("{}",k.to_string());
+                    // println!("{}",v.to_string());
+                    // (id) VALUES "from_account"(from_account)
+                    if k.clone()==String::from("from_account"){
+                        properties_from.insert("from_account".to_string(), v.clone().to_string());
                     }
-                    if k.clone()==String::from("value"){
-                        properties_add_values.insert("value".to_string(), v.clone().to_string());
+                    else if k.clone()==String::from("to_account"){
+                        properties_to.insert("to_account".to_string(), v.clone().to_string());
                     }
-                        
-                }
-            
-                let space_name = entity.space_name.clone();
-                let tag_name = space_name.clone() + "_tag";
-                
-                let vid_from = properties_add.get("id").unwrap().clone().replace("\"", "");
-                
-                let upsert_tag_query_add = InsertTagQuery::new(space_name.clone(), tag_name.clone(), properties_add_values, vid_from.clone());
-                insert_tag_queries.push(upsert_tag_query_add);
-            }
-        }
-        insert_tag_queries
-    }
-
-    pub fn entity_to_upsert_sub_tag_query(entities: &Vec<EntityWithSpaceName>) -> Vec<InsertTagQuery>{
-        let mut insert_tag_queries: Vec<InsertTagQuery> = Vec::new();
-        for entity in entities{
-            if entity.space_name == String::from("Poi$"){
-                continue;
-            }
-            let mut properties_sub: HashMap<String, String> = HashMap::new();
-            let mut properties_sub_values: HashMap<String, String> = HashMap::new();
-            if entity.entity.0.get("operation").unwrap().to_string()==String::from("1"){
-                for (k,v) in &entity.entity.0{
-
-                    if k.clone()==String::from("to_account"){
-                        properties_sub.insert("id".to_string(), v.clone().to_string());
-                    }
-
-                    if k.clone()==String::from("value"){
-                        properties_sub_values.insert("value".to_string(), v.clone().to_string());
-                    }
-                        
+                    else if k.clone()==String::from("value"){
+                        value = v.to_string();
+                    } 
                 }
                 let space_name = entity.space_name.clone();
                 let tag_name = space_name.clone() + "_tag";
-                let vid_from = properties_sub.get("id").unwrap().clone().replace("\"", "");
-                let upsert_tag_query_add = InsertTagQuery::new(space_name.clone(), tag_name.clone(), properties_sub_values, vid_from.clone());
-                insert_tag_queries.push(upsert_tag_query_add);
+                let vid_from = properties_from.get("from_account").unwrap().clone().replace("\"", "");
+                let vid_to = properties_to.get("to_account").unwrap().clone().replace("\"", "");
+                let insert_tag_query_from = InsertTagQuery::new(space_name.clone(), tag_name.clone(), properties_from, vid_from, true, value.parse::<i32>().unwrap());
+                let insert_tag_query_to = InsertTagQuery::new(space_name, tag_name, properties_to, vid_to,true, value.parse::<i32>().unwrap());
+                insert_tag_queries.push(insert_tag_query_from);
+                insert_tag_queries.push(insert_tag_query_to);
             }
         }
         insert_tag_queries
-    }
-    // pub fn entity_to_upsert_sub_tag_query(entities: &Vec<EntityWithSpaceName>) -> Vec<InsertTagQuery>{
-    //     let mut insert_tag_queries: Vec<InsertTagQuery> = Vec::new();
-    //     for entity in entities{
-    //         if entity.space_name == String::from("Poi$"){
-    //             continue;
-    //         }
-    //         let mut properties_from: HashMap<String, String> = HashMap::new();
-    //         // let mut properties_to: HashMap<String, String> = HashMap::new();
-
-    //         let mut properties_sub_values: HashMap<String, String> = HashMap::new();
-
-    //         for (key,value) in &entity.entity.0{
-    //             // (id) VALUES "from_account"(from_account)
-    //             println!("----------------kv------------------------");
-    //             println!("{:?}",key);
-    //             println!("{:?}",value.to_string());
-
-    //             if key.clone()==String::from("operation") && value.clone().to_string()==String::from("-1"){
-    //                 for (k,v) in &entity.entity.0{
-    //                     if k.clone()==String::from("to_account"){
-    //                         println!("----------------kv--to_account----------------------");
-    //                         println!("{:?}",k);
-    //                         println!("{:?}",v.to_string());
-    //                         properties_from.insert("id".to_string(), v.clone().to_string());
-    //                     }
-    //                     // if k.clone()==String::from("from_account"){
-    //                     //     properties_to.insert("id".to_string(), v.clone().to_string());
-    //                     //     println!("----------------kv--from_account----------------------");
-    //                     //     println!("{:?}",k);
-    //                     //     println!("{:?}",v.to_string());
-    //                     // }
-    //                     if k.clone()==String::from("value"){
-    //                         properties_sub_values.insert("value".to_string(), v.clone().to_string());
-    //                         println!("----------------kv--subvalue----------------------");
-    //                         println!("{:?}",k);
-    //                         println!("{:?}",v.to_string());
-    //                     }
-    //                 }
-    //             }
-    //             let space_name = entity.space_name.clone();
-    //             let tag_name = space_name.clone() + "_tag";
-    //             //None
-    //             // let vid_from = properties_from.get("id").unwrap().clone().replace("\"", "");
-    //             let vid_to = properties_from.get("id").unwrap().clone().replace("\"", "");
-    //             let upsert_tag_query_sub = InsertTagQuery::new(space_name.clone(), tag_name.clone(), properties_sub_values, vid_to.clone());
-    //             insert_tag_queries.push(upsert_tag_query_sub);
-    //         }
-    //     }
-    //     insert_tag_queries
-    // }
-    pub fn entity_to_insert_add_edge_queries(entities: &Vec<EntityWithSpaceName>) -> Vec<InsertEdgeQueryWithRank>{
-        let mut insert_edge_queries: Vec<InsertEdgeQueryWithRank> = Vec::new();
-        for entity in entities{
-            if entity.space_name == String::from("Poi$"){
-                continue;
-            }
-            let mut properties: HashMap<String, String> = HashMap::new();
-            let mut transaction_properties: HashMap<String, String> = HashMap::new();
-            if entity.entity.0.get("operation").unwrap().to_string()==String::from("-1"){
-                for (k,v) in &entity.entity.0{
-                    properties.insert(k.clone(), v.to_string());
-                }
-                // println!("---------------------insert_add_edge_queries-----------------------");
-                
-                let space_name = entity.space_name.clone();
-                let to_vertex = properties.get("from_account").unwrap().clone().replace("\"", "");
-                let from_vertex = properties.get("to_account").unwrap().clone().replace("\"", "");
-            
-                pub fn get_random_string(len: usize) -> String{
-                    let mut rng = rand::thread_rng();
-                    let mut test: Vec<u8> = vec![0; len];
-                    for i in &mut test{
-                        let dig_or_char: u8 = rng.gen_range(0..=1);
-                        match dig_or_char{
-                            0 => *i = rng.gen_range(48..=57),
-                            _ => *i = rng.gen_range(97..=122),
-                        }
-                    }
-                    String::from_utf8(test).unwrap()
-                }
-
-                //value_map
-                let value = properties.get("value").unwrap().clone().replace("\"", "");
-                let mut transactions = String::from("(");
-                transactions += &value;
-                transactions += ",";
-                transactions += &get_random_string(20);
-                transactions += ",";
-                transactions += "+";
-                transactions += ")";
-                transaction_properties.insert("transactions".to_string(),transactions);
-                let insert_edge_query = InsertEdgeQueryWithRank::new(
-                    space_name,
-                    "tx".to_string(),
-                    transaction_properties,
-                    from_vertex,
-                    to_vertex,
-                    entity.block_number,
-                );
-                insert_edge_queries.push(insert_edge_query);
-            }
-        }
-        insert_edge_queries
     }
 
     pub fn entity_to_insert_edge_queries(entities: &Vec<EntityWithSpaceName>) -> Vec<InsertEdgeQueryWithRank>{
+
+        pub fn get_random_string(len: usize) -> String{
+            let mut rng = rand::thread_rng();
+            let mut test: Vec<u8> = vec![0; len];
+            for i in &mut test{
+                let dig_or_char: u8 = rng.gen_range(0..=1);
+                match dig_or_char{
+                    0 => *i = rng.gen_range(48..=57),
+                    _ => *i = rng.gen_range(97..=122),
+                }
+            }
+            String::from_utf8(test).unwrap()
+        }
+
         let mut insert_edge_queries: Vec<InsertEdgeQueryWithRank> = Vec::new();
         for entity in entities{
             if entity.space_name == String::from("Poi$"){
                 continue;
             }
             let mut properties: HashMap<String, String> = HashMap::new();
-            if entity.entity.0.get("operation").unwrap().to_string()==String::from("-1"){
+            if entity.entity.0.get("operation").unwrap().to_string()==String::from("1"){
                 for (k,v) in &entity.entity.0{
-                    // if k.clone()==String::from("id"){
-                    //     continue;
-                    // }
-                    properties.insert(k.clone(), v.to_string());
+                    if k.clone()==String::from("id") || k.clone()==String::from("operation"){
+                        continue;
+                    }else if k.clone()==String::from("value"){
+                        let mut transactions = String::from("(");
+                        transactions += &v.to_string();
+                        transactions += ",";
+                        transactions += &get_random_string(20);
+                        transactions += ",";
+                        transactions += "+";
+                        transactions += ")";
+                        properties.insert("transactions".to_string(),transactions);
+                        properties.insert(k.clone(), v.to_string());
+                    }else{
+                        properties.insert(k.clone(), v.to_string());
+                    }
                 }
                 let space_name = entity.space_name.clone();
                 let to_vertex = properties.get("from_account").unwrap().clone().replace("\"", "");
@@ -1977,11 +1837,6 @@ impl EntityWithSpaceName{
                 //value_map
                 let value = properties.get("value").unwrap().clone().replace("\"", "");
                 
-                fn get_random_int(min: i64, max: i64) -> i64{
-                    let mut rng = rand::thread_rng();
-                    let res: i64 = rng.gen_range(min..=max);
-                    res
-                }
                 
                 let insert_edge_query = InsertEdgeQueryWithRank::new(
                     space_name,
@@ -1990,6 +1845,7 @@ impl EntityWithSpaceName{
                     from_vertex,
                     to_vertex,
                     entity.block_number,
+                    value.parse::<i32>().unwrap(),
                 );
                 insert_edge_queries.push(insert_edge_query);
             }

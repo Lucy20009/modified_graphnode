@@ -105,6 +105,8 @@ pub struct InsertTagQuery{
     pub tag_name: String, 
     pub kv: HashMap<String, String>, 
     pub vid: String,
+    pub add: bool,
+    pub value: i32,
 }
 impl InsertTagQuery{
     pub fn new(
@@ -112,12 +114,16 @@ impl InsertTagQuery{
         tag_name: String, 
         kv: HashMap<String, String>, 
         vid: String,
+        add: bool,
+        value: i32,
     ) -> Self{
         InsertTagQuery{
             space_name, 
             tag_name, 
             kv, 
             vid,
+            add,
+            value,
         }
     }
     pub fn to_string(&self)-> String{
@@ -158,6 +164,7 @@ pub struct InsertEdgeQueryWithRank{
     pub from_vertex: String, 
     pub to_vertex: String,
     pub rank: i32,
+    pub value: i32,
 }
 impl InsertEdgeQueryWithRank{
     pub fn new(
@@ -167,6 +174,7 @@ impl InsertEdgeQueryWithRank{
         from_vertex: String, 
         to_vertex: String,
         rank: i32,
+        value: i32,
     ) -> Self{
         InsertEdgeQueryWithRank{
             space_name,
@@ -175,6 +183,7 @@ impl InsertEdgeQueryWithRank{
             from_vertex, 
             to_vertex,
             rank,
+            value
         }
     }
     pub fn to_string(&self)-> String{
