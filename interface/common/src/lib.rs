@@ -96,7 +96,7 @@ pub mod types {
     pub enum Value {
         nVal(crate::types::NullType),
         bVal(::std::primitive::bool),
-        iVal(::std::primitive::i32),
+        iVal(::std::primitive::i64),
         fVal(crate::double::Double),
         sVal(::std::vec::Vec<::std::primitive::u8>),
         dVal(crate::types::Date),
@@ -122,7 +122,7 @@ pub mod types {
                 _ => String::from("")
             }
         }
-        pub fn parse_simple_type(&self) -> i32 {
+        pub fn parse_simple_type(&self) -> i64 {
             let value = self.clone();
             let r = 0;
             match value {

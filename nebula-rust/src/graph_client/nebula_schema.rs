@@ -106,7 +106,7 @@ pub struct InsertTagQuery{
     pub kv: HashMap<String, String>, 
     pub vid: String,
     pub add: bool,
-    pub value: i32,
+    pub value: i64,
 }
 impl InsertTagQuery{
     pub fn new(
@@ -115,7 +115,7 @@ impl InsertTagQuery{
         kv: HashMap<String, String>, 
         vid: String,
         add: bool,
-        value: i32,
+        value: i64,
     ) -> Self{
         InsertTagQuery{
             space_name, 

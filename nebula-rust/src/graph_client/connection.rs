@@ -202,7 +202,7 @@ impl Connection {
 
     #[inline]
     // INSERT VERTEX t2 (name, age) VALUES "11":("n1", 12);
-    pub async fn insert_tag(&self, space_name: &str, tag_name: &str, kv: HashMap<String, String>, vid: &str, value: i32, session_id: i64){
+    pub async fn insert_tag(&self, space_name: &str, tag_name: &str, kv: HashMap<String, String>, vid: &str, value: i64, session_id: i64){
 
         if self.find_tag_or_edge(space_name, tag_name, ColType::Tag, session_id).await == false{
             std::thread::sleep(std::time::Duration::from_millis(5000));
@@ -430,7 +430,7 @@ impl Connection {
     }
 
     #[inline]
-    pub async fn find_value_by_id(&self, space_name: &str, tag_name: &str, vid:&str, session_id: i64) -> i32{
+    pub async fn find_value_by_id(&self, space_name: &str, tag_name: &str, vid:&str, session_id: i64) -> i64{
         //FETCH PROP ON TokenTransfer_tag "0x256a0b3cb2174d042e4445563ca4977f837a7803" YIELD TokenTransfer_tag.value; 
         let mut query = String::from("use ");
         query += space_name;

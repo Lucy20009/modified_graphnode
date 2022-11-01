@@ -273,7 +273,7 @@ impl DeploymentStore {
                 let defaults = "";
                 let comment = "";
                 let tag_id = Tag::new(property_name, data_type, allow_null, defaults, comment);
-                let tag_value = Tag::new("value", DataType::Int32, allow_null, "", comment);
+                let tag_value = Tag::new("value", DataType::Int64, allow_null, "", comment);
                 tags.push(tag_id);
                 tags.push(tag_value);
             }
@@ -1783,8 +1783,8 @@ impl EntityWithSpaceName{
                 let tag_name = space_name.clone() + "_tag";
                 let vid_from = properties_from.get("from_account").unwrap().clone().replace("\"", "");
                 let vid_to = properties_to.get("to_account").unwrap().clone().replace("\"", "");
-                let insert_tag_query_from = InsertTagQuery::new(space_name.clone(), tag_name.clone(), properties_from, vid_from, true, value.parse::<i32>().unwrap());
-                let insert_tag_query_to = InsertTagQuery::new(space_name, tag_name, properties_to, vid_to,true, value.parse::<i32>().unwrap());
+                let insert_tag_query_from = InsertTagQuery::new(space_name.clone(), tag_name.clone(), properties_from, vid_from, true, value.parse::<i64>().unwrap());
+                let insert_tag_query_to = InsertTagQuery::new(space_name, tag_name, properties_to, vid_to,true, value.parse::<i64>().unwrap());
                 insert_tag_queries.push(insert_tag_query_from);
                 insert_tag_queries.push(insert_tag_query_to);
             }
